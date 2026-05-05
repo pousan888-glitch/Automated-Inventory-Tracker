@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 256 && id.matches('^[a-zA-Z0-9_\\-\\.\\/ ]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Master Inventory
+    match /inventory/{serialNo} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() 
+        && isValidId(serialNo)
+        && incoming().status in ['IN', 'OUT']
+        && incoming().lastUpdate == request.time;
+      allow delete: if isSignedIn() && isValidId(serialNo);
+    }
+
+    // Transaction Logs
+    match /logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && incoming().date == request.time
+        && incoming().transactionType in ['IN', 'OUT'];
+      allow update: if false; // Logs are immutable
+      allow delete: if isSignedIn();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

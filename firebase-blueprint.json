@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Represents an item in the master inventory.",
+      "type": "object",
+      "properties": {
+        "serialNo": { "type": "string", "description": "Primary unique identifier for the item." },
+        "partNo": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["IN", "OUT"] },
+        "currentLocation": { "type": "string" },
+        "lastUpdate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["serialNo", "status", "currentLocation", "lastUpdate"]
+    },
+    "TransactionLog": {
+      "title": "Transaction Log",
+      "description": "Record of a specific movement of an item.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date-time" },
+        "invoiceNo": { "type": "string" },
+        "transactionType": { "type": "string", "enum": ["IN", "OUT"] },
+        "serialNo": { "type": "string" },
+        "origin": { "type": "string" },
+        "destination": { "type": "string" },
+        "lineItem": { "type": "string" },
+        "importEntryNo": { "type": "string" },
+        "importEntryLineNo": { "type": "string" }
+      },
+      "required": ["date", "invoiceNo", "transactionType", "serialNo"]
+    }
+  },
+  "firestore": {
+    "inventory": {
+      "schema": "InventoryItem",
+      "description": "Master inventory collection."
+    },
+    "logs": {
+      "schema": "TransactionLog",
+      "description": "History of all inventory movements."
+    }
+  }
+}

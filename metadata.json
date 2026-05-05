@@ -1,0 +1,6 @@
+{
+  "name": "Automated Inventory Tracker",
+  "description": "An automated inventory management system that parses shipping invoices to track movements and update stock levels.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
