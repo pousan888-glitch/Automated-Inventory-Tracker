@@ -164,7 +164,7 @@ export function subscribeToInventory(callback: (items: InventoryItem[]) => void)
 }
 
 export function subscribeToLogs(callback: (logs: TransactionLog[]) => void) {
-  const q = query(collection(db, 'logs'), orderBy('date', 'desc'), limit(50));
+  const q = query(collection(db, 'logs'), orderBy('date', 'desc'));
   return onSnapshot(q, (snapshot) => {
     const logs = snapshot.docs.map(doc => doc.data() as TransactionLog);
     callback(logs);

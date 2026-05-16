@@ -72,6 +72,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
                 <ArrowRight className="w-5 h-5" />
               </button>
 
+              <div className="text-center">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                  Trouble signing in? <br/>
+                  Try <span className="text-blue-600">Opening in New Tab</span> if you're in a frame.
+                </p>
+              </div>
+
               <div className="flex items-start gap-4 p-4 bg-slate-50 border-2 border-slate-900">
                 <Warehouse className="w-5 h-5 opacity-40 shrink-0" />
                 <p className="text-[9px] font-mono uppercase leading-relaxed text-slate-500">
