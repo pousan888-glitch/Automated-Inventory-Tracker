@@ -14,24 +14,36 @@ service cloud.firestore {
       return request.resource.data;
     }
 
+    function existing() {
+      return resource.data;
+    }
+
     // Master Inventory
     match /inventory/{serialNo} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() 
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() 
         && isValidId(serialNo)
+        && incoming().userId == request.auth.uid
         && incoming().status in ['IN', 'OUT']
         && incoming().lastUpdate == request.time;
-      allow delete: if isSignedIn() && isValidId(serialNo);
+      allow update: if isSignedIn()
+        && isValidId(serialNo)
+        && incoming().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().status in ['IN', 'OUT']
+        && incoming().lastUpdate == request.time;
+      allow delete: if isSignedIn() && isValidId(serialNo) && resource.data.userId == request.auth.uid;
     }
 
     // Transaction Logs
     match /logs/{logId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn()
+        && incoming().userId == request.auth.uid
         && incoming().date == request.time
         && incoming().transactionType in ['IN', 'OUT'];
       allow update: if false; // Logs are immutable
-      allow delete: if isSignedIn();
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     // Default deny

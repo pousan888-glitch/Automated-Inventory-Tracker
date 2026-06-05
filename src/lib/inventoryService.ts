@@ -52,6 +52,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 export interface InventoryItem {
+  userId?: string;
   serialNo: string;
   partNo: string;
   description: string;
@@ -63,6 +64,7 @@ export interface InventoryItem {
 }
 
 export interface TransactionLog {
+  userId?: string;
   date: any; // Firestore Timestamp
   invoiceNo: string;
   transactionType: 'IN' | 'OUT';
@@ -85,6 +87,11 @@ export async function processInventoryUpdate(
     importEntryLineNo: string;
   }>
 ) {
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    throw new Error('User must be authenticated to process inventory updates.');
+  }
+
   const isLeavingBase = (header.shipFrom || '').toLowerCase().includes('schlumberger');
   const transactionType: 'IN' | 'OUT' = isLeavingBase ? 'OUT' : 'IN';
   const currentLocation = isLeavingBase ? header.consignee : 'In-Base';
@@ -93,13 +100,15 @@ export async function processInventoryUpdate(
     const serialNo = item.serialNo.trim();
     if (!serialNo) continue;
 
-    const docId = serialNo.replace(/\//g, '_');
+    // Separate storage key for each user: users will not overwrite each other
+    const docId = `${userId}_${serialNo.replace(/\//g, '_')}`;
     const inventoryRef = doc(db, 'inventory', docId);
     const logRef = collection(db, 'logs');
 
     try {
-      // Update/Create Master Inventory
+      // Update/Create Master Inventory for this user
       await setDoc(inventoryRef, {
+        userId,
         serialNo,
         partNo: item.partNo,
         description: item.description,
@@ -110,8 +119,9 @@ export async function processInventoryUpdate(
         importEntryLineNo: item.importEntryLineNo || ''
       }, { merge: true });
 
-      // Add Transaction Log
+      // Add Transaction Log for this user
       await addDoc(logRef, {
+        userId,
         date: serverTimestamp(),
         invoiceNo: header.invoiceNo,
         transactionType,
@@ -130,13 +140,18 @@ export async function processInventoryUpdate(
 
 export async function wipeAllData(type: 'inventory' | 'logs' | 'all') {
   console.log(`Starting wipe process for: ${type}`);
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    throw new Error('User must be authenticated to wipe data.');
+  }
+
   const collections = type === 'all' ? ['inventory', 'logs'] : [type];
   
   for (const colName of collections) {
-    console.log(`Fetching documents from ${colName}...`);
-    const q = query(collection(db, colName));
+    console.log(`Fetching documents from ${colName} for user ${userId}...`);
+    const q = query(collection(db, colName), where('userId', '==', userId));
     const snapshot = await getDocs(q);
-    console.log(`Found ${snapshot.docs.length} documents in ${colName}`);
+    console.log(`Found ${snapshot.docs.length} documents in ${colName} for user ${userId}`);
     
     // Firestore batch limit is 500 operations
     const docs = snapshot.docs;
@@ -154,9 +169,23 @@ export async function wipeAllData(type: 'inventory' | 'logs' | 'all') {
 }
 
 export function subscribeToInventory(callback: (items: InventoryItem[]) => void) {
-  const q = query(collection(db, 'inventory'), orderBy('lastUpdate', 'desc'));
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    callback([]);
+    return () => {};
+  }
+  const q = query(
+    collection(db, 'inventory'), 
+    where('userId', '==', userId)
+  );
   return onSnapshot(q, (snapshot) => {
-    const items = snapshot.docs.map(doc => doc.data() as InventoryItem);
+    const items = snapshot.docs
+      .map(doc => doc.data() as InventoryItem)
+      .sort((a, b) => {
+        const timeA = a.lastUpdate?.toMillis ? a.lastUpdate.toMillis() : 0;
+        const timeB = b.lastUpdate?.toMillis ? b.lastUpdate.toMillis() : 0;
+        return timeB - timeA; // Descending
+      });
     callback(items);
   }, (error) => {
     handleFirestoreError(error, OperationType.LIST, 'inventory');
@@ -164,9 +193,23 @@ export function subscribeToInventory(callback: (items: InventoryItem[]) => void)
 }
 
 export function subscribeToLogs(callback: (logs: TransactionLog[]) => void) {
-  const q = query(collection(db, 'logs'), orderBy('date', 'desc'));
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    callback([]);
+    return () => {};
+  }
+  const q = query(
+    collection(db, 'logs'), 
+    where('userId', '==', userId)
+  );
   return onSnapshot(q, (snapshot) => {
-    const logs = snapshot.docs.map(doc => doc.data() as TransactionLog);
+    const logs = snapshot.docs
+      .map(doc => doc.data() as TransactionLog)
+      .sort((a, b) => {
+        const timeA = a.date?.toMillis ? a.date.toMillis() : 0;
+        const timeB = b.date?.toMillis ? b.date.toMillis() : 0;
+        return timeB - timeA; // Descending
+      });
     callback(logs);
   }, (error) => {
     handleFirestoreError(error, OperationType.LIST, 'logs');

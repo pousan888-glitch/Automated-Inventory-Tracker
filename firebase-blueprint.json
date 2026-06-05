@@ -5,6 +5,7 @@
       "description": "Represents an item in the master inventory.",
       "type": "object",
       "properties": {
+        "userId": { "type": "string", "description": "The UID of the user who owns this inventory item." },
         "serialNo": { "type": "string", "description": "Primary unique identifier for the item." },
         "partNo": { "type": "string" },
         "description": { "type": "string" },
@@ -12,13 +13,14 @@
         "currentLocation": { "type": "string" },
         "lastUpdate": { "type": "string", "format": "date-time" }
       },
-      "required": ["serialNo", "status", "currentLocation", "lastUpdate"]
+      "required": ["userId", "serialNo", "status", "currentLocation", "lastUpdate"]
     },
     "TransactionLog": {
       "title": "Transaction Log",
       "description": "Record of a specific movement of an item.",
       "type": "object",
       "properties": {
+        "userId": { "type": "string", "description": "The UID of the user who owns this transaction log." },
         "date": { "type": "string", "format": "date-time" },
         "invoiceNo": { "type": "string" },
         "transactionType": { "type": "string", "enum": ["IN", "OUT"] },
@@ -29,7 +31,7 @@
         "importEntryNo": { "type": "string" },
         "importEntryLineNo": { "type": "string" }
       },
-      "required": ["date", "invoiceNo", "transactionType", "serialNo"]
+      "required": ["userId", "date", "invoiceNo", "transactionType", "serialNo"]
     }
   },
   "firestore": {
