@@ -146,7 +146,8 @@ export async function processInventoryUpdate(
     ibase?: string;
     remark?: string;
     customsStatus?: string;
-  }>
+  }>,
+  overrideType?: 'IN' | 'OUT'
 ) {
   const userId = auth.currentUser?.uid;
   if (!userId) {
@@ -154,8 +155,8 @@ export async function processInventoryUpdate(
   }
 
   const isLeavingBase = (header.shipFrom || '').toLowerCase().includes('schlumberger');
-  const transactionType: 'IN' | 'OUT' = isLeavingBase ? 'OUT' : 'IN';
-  const currentLocation = isLeavingBase ? header.consignee : 'In-Base';
+  const transactionType: 'IN' | 'OUT' = overrideType !== undefined ? overrideType : (isLeavingBase ? 'OUT' : 'IN');
+  const currentLocation = transactionType === 'OUT' ? (header.consignee || 'ต่างประเทศ (Exported)') : 'In-Base';
 
   for (const item of items) {
     const serialNo = item.serialNo.trim();
@@ -176,7 +177,7 @@ export async function processInventoryUpdate(
         status: transactionType,
         currentLocation: currentLocation,
         lastUpdate: serverTimestamp(),
-        importEntryNo: item.importEntryNo || '',
+        importEntryNo: item.importEntryNo || item.customEntry || '',
         importEntryLineNo: item.importEntryLineNo || '',
         invoiceNo: header.invoiceNo,
 
@@ -192,7 +193,7 @@ export async function processInventoryUpdate(
         meaningInThai: item.meaningInThai || '',
         dimension: item.dimension || '',
         package: item.package || '',
-        customEntry: item.customEntry || '',
+        customEntry: item.customEntry || item.importEntryNo || '',
         vessel: item.vessel || '',
         segment: item.segment || '',
         ibase: item.ibase || '',
@@ -211,7 +212,7 @@ export async function processInventoryUpdate(
         origin: header.shipFrom,
         destination: header.consignee,
         lineItem: item.lineItem,
-        importEntryNo: item.importEntryNo,
+        importEntryNo: item.importEntryNo || item.customEntry || '',
         importEntryLineNo: item.importEntryLineNo,
 
         // Bind log level metadata
@@ -228,7 +229,7 @@ export async function processInventoryUpdate(
         meaningInThai: item.meaningInThai || '',
         dimension: item.dimension || '',
         package: item.package || '',
-        customEntry: item.customEntry || '',
+        customEntry: item.customEntry || item.importEntryNo || '',
         vessel: item.vessel || '',
         segment: item.segment || '',
         ibase: item.ibase || '',
@@ -357,6 +358,9 @@ export async function importMasterInventory(items: Array<Partial<InventoryItem>>
       const docId = `${userId}_${serialNo.replace(/\//g, '_')}`;
       const inventoryRef = doc(db, 'inventory', docId);
 
+      const cleanCustomEntry = (item.customEntry || item.importEntryNo || '').trim();
+      const cleanImportEntryNo = (item.importEntryNo || item.customEntry || '').trim();
+
       const cleanItem: any = {
         userId,
         serialNo,
@@ -365,10 +369,11 @@ export async function importMasterInventory(items: Array<Partial<InventoryItem>>
         status: (item.status === 'OUT' ? 'OUT' : 'IN'),
         currentLocation: (item.currentLocation || 'In-Base').trim(),
         lastUpdate: serverTimestamp(),
-        importEntryNo: (item.importEntryNo || '').trim(),
+        importEntryNo: cleanImportEntryNo,
         importEntryLineNo: (item.importEntryLineNo || '').trim(),
         invoiceNo: (item.invoiceNo || '').trim(),
-        lineItem: lineItem
+        lineItem: lineItem,
+        customEntry: cleanCustomEntry
       };
 
       if (item.coo) cleanItem.coo = String(item.coo).trim();

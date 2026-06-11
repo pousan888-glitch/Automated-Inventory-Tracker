@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone, type FileRejection, type DropEvent } from 'react-dropzone';
 import * as XLSX from 'xlsx';
-import { Upload, FileCheck, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { processInventoryUpdate } from '../lib/inventoryService';
+import { Upload, FileCheck, Loader2, AlertCircle, CheckCircle2, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { processInventoryUpdate, subscribeToInventory, InventoryItem } from '../lib/inventoryService';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 
@@ -45,11 +45,137 @@ interface ExtractedData {
   }>;
 }
 
+// Levenshtein distance for fuzzy matching
+function getLevenshteinDistance(a: string, b: string): number {
+  const tmp = [];
+  let i, j;
+  for (i = 0; i <= a.length; i++) {
+    tmp[i] = [i];
+  }
+  for (j = 0; j <= b.length; j++) {
+    tmp[0][j] = j;
+  }
+  for (i = 1; i <= a.length; i++) {
+    for (j = 1; j <= b.length; j++) {
+      tmp[i][j] = Math.min(
+        tmp[i - 1][j] + 1,
+        tmp[i][j - 1] + 1,
+        tmp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+  }
+  return tmp[a.length][b.length];
+}
+
+// Word tokenization
+function getWords(str: string): Set<string> {
+  return new Set(
+    (str || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 2)
+  );
+}
+
+// Token Jaccard similarity for descriptions
+function getWordSimilarity(str1: string, str2: string): number {
+  const w1 = getWords(str1);
+  const w2 = getWords(str2);
+  if (w1.size === 0 || w2.size === 0) return 0;
+  const intersection = new Set([...w1].filter((x) => w2.has(x)));
+  const union = new Set([...w1, ...w2]);
+  return intersection.size / union.size;
+}
+
 export default function FileProcessor() {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadType, setUploadType] = useState<'IN' | 'OUT'>('IN');
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  
+  // Track existing master inventory items
+  const [existingInventory, setExistingInventory] = useState<InventoryItem[]>([]);
+  // Track resolutions for fuzzy similar matches on row index
+  const [resolutions, setResolutions] = useState<Record<number, { type: 'same' | 'separate'; originalSerial: string; correctedSerial?: string }>>({});
+
+  useEffect(() => {
+    const unsubscribe = subscribeToInventory((items) => {
+      setExistingInventory(items);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Check if a row has a potential match in current inventory
+  const isFuzzyMatch = useCallback((item: any) => {
+    const serialNormalized = (item.serialNo || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    if (!serialNormalized || serialNormalized === 'na' || serialNormalized === 'n/a') return null;
+
+    for (const existing of existingInventory) {
+      const existingSerialNormalized = (existing.serialNo || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      if (!existingSerialNormalized || existingSerialNormalized === 'na' || existingSerialNormalized === 'n/a') continue;
+
+      // Type 1: Format Typo (Same normalized characters but different symbols/spaces/casing)
+      const isFormatTypo = (serialNormalized === existingSerialNormalized) && (item.serialNo !== existing.serialNo);
+
+      // Type 2: Close serial match by character edit distance (Levenshtein <= 2) and description is highly similar or part number matches
+      const dist = getLevenshteinDistance(serialNormalized, existingSerialNormalized);
+      const isCloseSerial = dist > 0 && dist <= 2;
+      const descSim = getWordSimilarity(item.description, existing.description);
+      const partNoMatch = item.partNo && existing.partNo && (item.partNo.toLowerCase().trim() === existing.partNo.toLowerCase().trim());
+      
+      const isDescriptionOrPartSimilar = descSim > 0.4 || partNoMatch;
+
+      if (isFormatTypo || (isCloseSerial && isDescriptionOrPartSimilar)) {
+        return {
+          existing,
+          reason: isFormatTypo 
+            ? 'รูปแบบตัวอักษรพิมพ์ใหญ่/เล็กหรืออักขระพิเศษต่างกันเล็กน้อย (Format punctuation discrepancy)' 
+            : `รหัสซีเรียลพิมพ์ผิดหรือใกล้เคียงกัน (ระยะแก้ไข=${dist}) และคำอธิบายชิ้นงานมีความคล้ายคลึงกัน`,
+          score: Math.max(descSim, partNoMatch ? 1 : 0),
+          dist
+        };
+      }
+    }
+    return null;
+  }, [existingInventory]);
+
+  const handleResolveSame = (idx: number, correctedSerial: string) => {
+    if (!extractedData) return;
+    const updatedItems = [...extractedData.items];
+    const originalSerial = updatedItems[idx].serialNo;
+    updatedItems[idx].serialNo = correctedSerial;
+    setExtractedData({
+      ...extractedData,
+      items: updatedItems
+    });
+    setResolutions(prev => ({
+      ...prev,
+      [idx]: { type: 'same', originalSerial, correctedSerial }
+    }));
+  };
+
+  const handleResolveSeparate = (idx: number) => {
+    if (!extractedData) return;
+    setResolutions(prev => ({
+      ...prev,
+      [idx]: { type: 'separate', originalSerial: extractedData.items[idx].serialNo }
+    }));
+  };
+
+  const pendingVerificationCount = extractedData?.items.reduce((acc, item, idx) => {
+    const match = isFuzzyMatch(item);
+    if (match && !resolutions[idx]) {
+      return acc + 1;
+    }
+    return acc;
+  }, 0) || 0;
+
+  const totalFuzzyMatchCount = extractedData?.items.reduce((acc, item) => {
+    const match = isFuzzyMatch(item);
+    return match ? acc + 1 : acc;
+  }, 0) || 0;
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -58,6 +184,7 @@ export default function FileProcessor() {
     setIsProcessing(true);
     setError(null);
     setSuccess(false);
+    setResolutions({});
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -70,6 +197,16 @@ export default function FileProcessor() {
 
         console.log('Parsed JSON:', jsonData);
 
+        // Heuristic for table start (look for Serial No header)
+        let tableHeaderIdx = -1;
+        for (let i = 0; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          if (Array.isArray(row) && row.some((cell: any) => cell && String(cell).toLowerCase().includes('serial no'))) {
+            tableHeaderIdx = i;
+            break;
+          }
+        }
+
         // Robust extraction logic
         let invoiceNo = '';
         let date = '';
@@ -77,10 +214,12 @@ export default function FileProcessor() {
         let consignee = '';
         let segment = '';
         let vessel = '';
+        let invoiceStatus = '';
         const items: any[] = [];
 
-        // Scan the first 30 rows for header information
-        const headerRows = jsonData.slice(0, 30);
+        // Scan pre-table rows (or up to first 30 rows if table header not found) for header information
+        const headerLimit = tableHeaderIdx !== -1 ? tableHeaderIdx : Math.min(30, jsonData.length);
+        const headerRows = jsonData.slice(0, headerLimit);
         headerRows.forEach((row: any) => {
           if (!Array.isArray(row)) return;
           row.forEach((cell, idx) => {
@@ -106,7 +245,7 @@ export default function FileProcessor() {
                 // Look for value in the same row first
                 for (let i = 1; i <= 3; i++) {
                   const val = String(row[idx + i] || '').trim();
-                  if (val && !val.toLowerCase().includes('attn') && val.length > 2) return val;
+                  if (val && !val.toLowerCase().includes('attn') && val.length >= 2) return val;
                 }
                 // Look for value in the rows directly below this cell
                 const currentRowIdx = jsonData.indexOf(row);
@@ -114,7 +253,7 @@ export default function FileProcessor() {
                   const nextRow = jsonData[currentRowIdx + i] as any[];
                   if (nextRow && nextRow[idx]) {
                     const val = String(nextRow[idx]).trim();
-                    if (val && val.length > 2 && !val.toLowerCase().includes('attn')) return val;
+                    if (val && val.length >= 2 && !val.toLowerCase().includes('attn')) return val;
                   }
                 }
               }
@@ -138,16 +277,21 @@ export default function FileProcessor() {
 
             const extractedVessel = extractValue('vessel');
             if (extractedVessel) vessel = extractedVessel;
+
+            const extractedStatus = extractValue('status');
+            if (extractedStatus) {
+              const cleanedStatus = extractedStatus.toUpperCase().trim();
+              if (cleanedStatus === 'FZ' || cleanedStatus === 'LOCAL' || cleanedStatus.includes('LOCAL') || cleanedStatus.includes('FZ')) {
+                invoiceStatus = cleanedStatus;
+              }
+            }
           });
         });
 
-        // Heuristic for table start (look for Serial No header)
-        let tableHeaderIdx = -1;
-        for (let i = 0; i < jsonData.length; i++) {
-          const row = jsonData[i];
-          if (Array.isArray(row) && row.some((cell: any) => cell && String(cell).toLowerCase().includes('serial no'))) {
-            tableHeaderIdx = i;
-            break;
+        if (invoiceStatus && invoiceNo) {
+          const suffix = invoiceStatus.toUpperCase();
+          if (!invoiceNo.toUpperCase().includes(suffix)) {
+            invoiceNo = `${invoiceNo}-${suffix}`;
           }
         }
 
@@ -191,13 +335,17 @@ export default function FileProcessor() {
             }
 
             if (sIdx !== -1 && row[sIdx]) {
+              const parsedIenVal = ienIdx !== -1 ? String(row[ienIdx] || '').trim() : '';
+              const parsedCustomVal = customIdx !== -1 ? String(row[customIdx] || '').trim() : '';
+              const finalEntryNo = parsedIenVal || parsedCustomVal || '';
+
               items.push({
                 lineItem: String(row[lIdx] || i - tableHeaderIdx),
                 partNo: String(row[pIdx] || 'N/A'),
                 serialNo: String(row[sIdx]).trim(),
                 description: String(row[dIdx] || 'No Description'),
-                importEntryNo: String(row[ienIdx] || ''),
-                importEntryLineNo: String(row[ielIdx] || ''),
+                importEntryNo: finalEntryNo,
+                importEntryLineNo: ielIdx !== -1 ? String(row[ielIdx] || '').trim() : '',
 
                 coo: cooIdx !== -1 ? String(row[cooIdx] || '') : '',
                 hsCode: hsIdx !== -1 ? String(row[hsIdx] || '') : '',
@@ -210,11 +358,12 @@ export default function FileProcessor() {
                 meaningInThai: thaiIdx !== -1 ? String(row[thaiIdx] || '') : '',
                 dimension: dimIdx !== -1 ? String(row[dimIdx] || '') : '',
                 package: pkgIdx !== -1 ? String(row[pkgIdx] || '') : '',
-                customEntry: customIdx !== -1 ? String(row[customIdx] || '') : '',
+                customEntry: finalEntryNo,
                 vessel: (vesselIdx !== -1 && String(row[vesselIdx] || '').trim()) ? String(row[vesselIdx]).trim() : vessel,
                 segment: (segmentIdx !== -1 && String(row[segmentIdx] || '').trim()) ? String(row[segmentIdx]).trim() : segment,
                 ibase: ibaseIdx !== -1 ? String(row[ibaseIdx] || '') : '',
                 remark: remarkIdx !== -1 ? String(row[remarkIdx] || '') : '',
+                customsStatus: invoiceStatus
               });
             }
           }
@@ -414,6 +563,9 @@ export default function FileProcessor() {
           throw new Error('No items with Serial Numbers found in the file.');
         }
 
+        const isLeaving = (shipFrom || '').toLowerCase().includes('schlumberger');
+        setUploadType(isLeaving ? 'OUT' : 'IN');
+
         setExtractedData({
           header: { invoiceNo, date, shipFrom, consignee },
           items
@@ -442,7 +594,7 @@ export default function FileProcessor() {
     if (!extractedData) return;
     setIsProcessing(true);
     try {
-      await processInventoryUpdate(extractedData.header, extractedData.items);
+      await processInventoryUpdate(extractedData.header, extractedData.items, uploadType);
       setSuccess(true);
       setExtractedData(null);
     } catch (err: any) {
@@ -454,22 +606,84 @@ export default function FileProcessor() {
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
+      {/* 🟢 Select Upload Mode Toggle Segmented Control */}
+      <div className="bg-white border-2 border-slate-900 p-5 neo-brutalism-shadow space-y-3">
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block font-mono">
+          ขั้นตอนที่ 1: เลือกเมนูสินค้าใน INVOICE (CHOOSE CIPL DIRECTION VALUE)
+        </label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            type="button"
+            onClick={() => setUploadType('IN')}
+            className={cn(
+              "flex flex-col sm:flex-row items-center justify-start gap-4 p-4 border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 text-left",
+              uploadType === 'IN'
+                ? "bg-emerald-50 border-emerald-600 text-emerald-800 ring-2 ring-emerald-600/30"
+                : "bg-white border-slate-300 hover:border-slate-800 text-slate-600"
+            )}
+          >
+            <div className={cn(
+              "p-2 border shrink-0 flex items-center justify-center rounded-none",
+              uploadType === 'IN' ? "border-emerald-600 bg-emerald-100 text-emerald-700" : "border-slate-300 bg-slate-50 text-slate-400"
+            )}>
+              <ArrowDownLeft className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="block text-[11px] font-black tracking-wide">ของเข้าคลัง (INCOMING / IMPORT)</span>
+              <span className="text-[9px] font-medium text-slate-400 block tracking-normal normal-case mt-0.5 font-mono">
+                สแกนเข้าระบบจัดเก็บคลังหลัก / สถานะสินค้าเปลี่ยนเป็น IN
+              </span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setUploadType('OUT')}
+            className={cn(
+              "flex flex-col sm:flex-row items-center justify-start gap-4 p-4 border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 text-left",
+              uploadType === 'OUT'
+                ? "bg-red-50 border-red-600 text-red-800 ring-2 ring-red-600/30"
+                : "bg-white border-slate-300 hover:border-slate-800 text-slate-600"
+            )}
+          >
+            <div className={cn(
+              "p-2 border shrink-0 flex items-center justify-center rounded-none",
+              uploadType === 'OUT' ? "border-red-600 bg-red-100 text-red-700" : "border-slate-300 bg-slate-50 text-slate-400"
+            )}>
+              <ArrowUpRight className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="block text-[11px] font-black tracking-wide">ของออก / ส่งไปต่างประเทศ (OUTGOING / EXPORT)</span>
+              <span className="text-[9px] font-medium text-slate-400 block tracking-normal normal-case mt-0.5 font-mono">
+                สินค้าเตรียมส่งออกต่างประเทศ / สถานะสินค้าเป็น OUT
+              </span>
+            </div>
+          </button>
+        </div>
+      </div>
+
       <div 
         {...getRootProps()} 
         className={cn(
-          "border-4 border-dashed p-16 flex flex-col items-center justify-center transition-all bg-white",
-          isDragActive ? "border-blue-600 bg-blue-50" : "border-slate-300 hover:border-slate-900"
+          "border-4 border-dashed p-16 flex flex-col items-center justify-center transition-all bg-white cursor-pointer",
+          isDragActive ? "border-blue-600 bg-blue-50" : "border-slate-300 hover:border-slate-900",
+          uploadType === 'IN' ? "hover:bg-emerald-50/20" : "hover:bg-red-50/20"
         )}
       >
         <input {...getInputProps()} />
         <div className="w-16 h-16 border-2 border-slate-900 flex items-center justify-center mb-6 bg-slate-100">
           <Upload className="w-8 h-8 text-slate-900" />
         </div>
-        <h3 className="text-xs font-black uppercase tracking-widest mb-2">Upload Shipping Invoice</h3>
+        <h3 className="text-xs font-black uppercase tracking-widest mb-2 font-sans text-center">
+          Upload Shipping Invoice ({uploadType === 'IN' ? 'ของเข้า / INCOMING' : 'ของออก / OUTGOING'})
+        </h3>
         <p className="text-[10px] opacity-40 uppercase tracking-widest text-center max-w-xs font-mono">
           Supports XLSX, CSV, XLS
         </p>
-        <button className="mt-8 px-12 py-3 bg-slate-900 text-white font-bold text-[10px] uppercase tracking-widest active-neo-brutalism neo-brutalism-shadow">
+        <button className={cn(
+          "mt-8 px-12 py-3 text-white font-bold text-[10px] uppercase tracking-widest active-neo-brutalism neo-brutalism-shadow",
+          uploadType === 'IN' ? "bg-emerald-600" : "bg-red-600"
+        )}>
           Browse Files
         </button>
       </div>
@@ -530,56 +744,157 @@ export default function FileProcessor() {
               </h3>
               <div className="flex gap-4">
                 <button 
-                  onClick={() => setExtractedData(null)}
+                  onClick={() => { setExtractedData(null); setResolutions({}); }}
                   className="px-6 py-2 bg-white border-2 border-slate-900 text-slate-900 text-[10px] font-bold uppercase transition-all active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
                 >
                   Discard
                 </button>
                 <button 
                   onClick={handleConfirm}
-                  className="px-8 py-2 bg-emerald-500 border-2 border-slate-900 text-white text-[10px] font-bold uppercase transition-all active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                  disabled={pendingVerificationCount > 0}
+                  className={cn(
+                    "px-8 py-2 border-2 border-slate-900 text-[10px] font-bold uppercase transition-all active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+                    pendingVerificationCount > 0 
+                      ? "bg-slate-300 text-slate-500 border-slate-400 cursor-not-allowed shadow-none" 
+                      : "bg-emerald-500 text-white hover:bg-emerald-600"
+                  )}
                 >
-                  Confirm & Commit
+                  {pendingVerificationCount > 0 ? `Verify Needed (${pendingVerificationCount})` : 'Confirm & Commit'}
                 </button>
               </div>
             </div>
 
-            <div className="p-8 grid grid-cols-2 gap-8 border-b-2 border-slate-100">
-              <div className="space-y-6">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 border-b-2 border-slate-900 bg-slate-50">
+              <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Invoice Reference</label>
-                  <p className="text-lg font-mono font-black">#{extractedData.header.invoiceNo || 'NULL'}</p>
-                  <p className="text-[10px] opacity-60 font-mono italic">{extractedData.header.date || 'UNSET'}</p>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block font-mono">
+                    เลขที่ใบกำกับสินค้า (Invoice Ref No.)
+                  </label>
+                  <input
+                    type="text"
+                    value={extractedData.header.invoiceNo}
+                    onChange={(e) => setExtractedData({
+                      ...extractedData,
+                      header: { ...extractedData.header, invoiceNo: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 bg-white border-2 border-slate-900 font-mono text-xs font-black focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                  />
                 </div>
+
                 <div>
-                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Logic Routing</label>
-                   <span className={cn(
-                    "inline-block px-3 py-1 text-[10px] font-black uppercase tracking-tighter border-2",
-                    (extractedData.header.shipFrom || '').toLowerCase().includes('schlumberger') 
-                      ? "bg-red-50 border-red-600 text-red-600" 
-                      : "bg-emerald-50 border-emerald-600 text-emerald-600"
-                  )}>
-                    Type: {(extractedData.header.shipFrom || '').toLowerCase().includes('schlumberger') ? 'OUT / EXIT_BASE' : 'IN / ENTER_BASE'}
-                  </span>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block font-mono">
+                    วันที่ออกเอกสาร (Document Date)
+                  </label>
+                  <input
+                    type="text"
+                    value={extractedData.header.date}
+                    onChange={(e) => setExtractedData({
+                      ...extractedData,
+                      header: { ...extractedData.header, date: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 bg-white border-2 border-slate-900 font-mono text-xs font-black focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                  />
                 </div>
-              </div>
-              <div className="space-y-6 border-l-2 border-slate-100 pl-8">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Origin / Destination</label>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-[8px] uppercase font-black text-slate-300">From</p>
-                      <p className="text-[11px] font-bold uppercase truncate">{extractedData.header.shipFrom || '---'}</p>
-                    </div>
-                    <div className="w-full h-px bg-slate-100" />
-                    <div>
-                      <p className="text-[8px] uppercase font-black text-slate-300">To</p>
-                      <p className="text-[11px] font-bold uppercase truncate">{extractedData.header.consignee || '---'}</p>
-                    </div>
+
+                <div className="bg-white p-3 border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
+                  <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 block font-mono">
+                    ปรับแก้ประเภทขบวนการ (PROCESS TYPE OVERRIDE)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUploadType('IN')}
+                      className={cn(
+                        "py-1.5 font-black text-[10px] uppercase tracking-wider text-center border-2 cursor-pointer transition-all active-translate-y-0.5",
+                        uploadType === 'IN'
+                          ? "bg-emerald-50 border-emerald-600 text-emerald-800"
+                          : "bg-slate-50 border-slate-300 text-slate-400"
+                      )}
+                    >
+                      ของเข้า (IN)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUploadType('OUT')}
+                      className={cn(
+                        "py-1.5 font-black text-[10px] uppercase tracking-wider text-center border-2 cursor-pointer transition-all active-translate-y-0.5",
+                        uploadType === 'OUT'
+                          ? "bg-red-50 border-red-600 text-red-800"
+                          : "bg-slate-50 border-slate-300 text-slate-400"
+                      )}
+                    >
+                      ของออก (OUT)
+                    </button>
                   </div>
                 </div>
               </div>
+
+              <div className="space-y-4 border-l-0 md:border-l-2 md:border-slate-300 md:pl-6">
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block font-mono">
+                    ผู้ส่งของต้นทาง (Ship From / Origin)
+                  </label>
+                  <input
+                    type="text"
+                    value={extractedData.header.shipFrom}
+                    onChange={(e) => setExtractedData({
+                      ...extractedData,
+                      header: { ...extractedData.header, shipFrom: e.target.value }
+                    })}
+                    placeholder="เช่น Schlumberger Solutions"
+                    className="w-full px-3 py-2 bg-white border-2 border-slate-900 font-sans text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block font-mono">
+                    ผู้รับของปลายทาง (Consignee / Destination)
+                  </label>
+                  <input
+                    type="text"
+                    value={extractedData.header.consignee}
+                    onChange={(e) => setExtractedData({
+                      ...extractedData,
+                      header: { ...extractedData.header, consignee: e.target.value }
+                    })}
+                    placeholder="ระบุจุดหมายหรือผู้รับ (เว้นว่างไว้จะพิจารณาเป็น ต่างประเทศ อัตโนมัติ)"
+                    className="w-full px-3 py-2 bg-white border-2 border-slate-900 font-sans text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                  />
+                  {uploadType === 'OUT' && (
+                    <p className="text-[9px] text-amber-600 font-mono font-medium mt-1">
+                      💡 กรณีส่งไปต่างประเทศ สามารถพิมพ์แก้ไขชื่อปลายทางได้ด้วยตัวเองจากตรงนี้!
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {totalFuzzyMatchCount > 0 && (
+              <div className="p-4 bg-amber-50 border-b-2 border-slate-900 space-y-2">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 border-2 border-amber-600 bg-amber-100 text-amber-800 shrink-0">
+                    <AlertCircle className="w-5 h-5 animate-pulse text-amber-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-amber-800 tracking-wider">
+                      ⚠️ พบข้อมูลสินค้าที่คล้ายคลึงกันในคลัง (Similarity / Fuzzy Match Detected)
+                    </h4>
+                    <p className="text-[11px] text-amber-700 font-medium font-sans">
+                      ระบบตรวจพบรายการที่มีรหัสซีเรียลหรือคำอธิบายสินค้าใกล้เคียงกับสินค้าในคลังปัจจุบันจำนวน <span className="font-bold underline">{totalFuzzyMatchCount}</span> รายการ โปรดยืนยันความถูกต้องในตารางก่อนที่จะสรุปคลังสินค้า
+                    </p>
+                    {pendingVerificationCount > 0 ? (
+                      <p className="text-[10px] text-rose-600 font-black uppercase mt-1">
+                        🚨 เหลืออีก {pendingVerificationCount} รายการที่ต้องคลิกเพื่อตัดสินใจก่อนที่จะ Commit บันทึกค่าได้
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-emerald-600 font-black uppercase mt-1">
+                        ✓ ยืนยันความสอดคล้องครบทุกรายการแล้ว คุณสามารถกด "Confirm & Commit" ได้อย่างปลอดภัย!
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="max-h-[400px] overflow-y-auto p-4 bg-slate-50">
               <table className="w-full text-left border-collapse bg-white border-2 border-slate-900">
@@ -594,18 +909,154 @@ export default function FileProcessor() {
                   </tr>
                 </thead>
                 <tbody className="text-[11px] font-mono divide-y border-slate-100">
-                  {extractedData.items.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-3 text-slate-400">{item.lineItem}</td>
-                      <td className="px-6 py-3 font-black text-slate-900">{item.serialNo}</td>
-                      <td className="px-6 py-3 text-slate-600">{item.partNo} / {item.description.slice(0, 30)}...</td>
-                      <td className="px-6 py-3 text-blue-600 font-bold">{item.importEntryNo || '-'}</td>
-                      <td className="px-6 py-3 text-blue-600 font-bold">{item.importEntryLineNo || '-'}</td>
-                      <td className="px-6 py-3 text-right">
-                         <span className="text-emerald-600 font-bold uppercase text-[9px]">Valid</span>
-                      </td>
-                    </tr>
-                  ))}
+                  {extractedData.items.map((item, idx) => {
+                    const match = isFuzzyMatch(item);
+                    const resolution = resolutions[idx];
+                    const hasWarning = !!match;
+                    const isPending = hasWarning && !resolution;
+
+                    return (
+                      <React.Fragment key={idx}>
+                        <tr className={cn(
+                          "hover:bg-slate-50 transition-colors",
+                          isPending ? "bg-amber-50/40" : "",
+                          resolution?.type === 'same' ? "bg-emerald-50/20 text-slate-900" : "",
+                          resolution?.type === 'separate' ? "bg-blue-50/20 text-slate-900" : ""
+                        )}>
+                          <td className="px-6 py-3 text-slate-400">{item.lineItem}</td>
+                          <td className="px-6 py-3 font-black text-slate-900">
+                            {item.serialNo}
+                            {resolution?.type === 'same' && (
+                              <span className="block text-[8px] font-sans font-medium text-emerald-600">
+                                (ซีเรียลเปลี่ยนตามระบบคลังแล้ว)
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3 text-slate-600">
+                            <strong>{item.partNo}</strong> / {item.description}
+                          </td>
+                          <td className="px-6 py-3 text-blue-600 font-bold">{item.importEntryNo || '-'}</td>
+                          <td className="px-6 py-3 text-blue-600 font-bold">{item.importEntryLineNo || '-'}</td>
+                          <td className="px-6 py-3 text-right">
+                            {hasWarning ? (
+                              isPending ? (
+                                <span className="bg-amber-100 text-amber-800 text-[9px] font-mono px-2.5 py-1 font-bold border-2 border-amber-600 uppercase animate-pulse">
+                                  ⚠️ รอตรวจสอบ
+                                </span>
+                              ) : resolution?.type === 'same' ? (
+                                <span className="bg-emerald-100 text-emerald-800 text-[9px] font-mono px-2.5 py-1 font-bold border-2 border-emerald-600 uppercase">
+                                  ✓ ตัวเดียวกัน
+                                </span>
+                              ) : (
+                                <span className="bg-blue-100 text-blue-800 text-[9px] font-mono px-2.5 py-1 font-bold border-2 border-blue-600 uppercase">
+                                  ✓ แยกคนละชิ้น
+                                </span>
+                              )
+                            ) : (
+                              <span className="text-emerald-700 font-bold uppercase text-[9px]">✓ Valid</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {hasWarning && (
+                          <tr className={cn(
+                            "border-b border-t",
+                            isPending ? "bg-amber-50/20 border-amber-200" :
+                            resolution?.type === 'same' ? "bg-emerald-50/10 border-emerald-100" : "bg-slate-50/30 border-slate-100"
+                          )}>
+                            <td colSpan={6} className="p-4 px-8">
+                              <div className="border-2 border-slate-900 bg-white p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-3 font-sans">
+                                <div className="flex items-start gap-3">
+                                  <div className={cn(
+                                    "p-1.5 border-2 shrink-0 rounded-none",
+                                    isPending ? "bg-amber-100 border-amber-600 text-amber-700" :
+                                    resolution?.type === 'same' ? "bg-emerald-100 border-emerald-600 text-emerald-700" : "bg-blue-100 border-blue-600 text-blue-700"
+                                  )}>
+                                    <AlertCircle className="w-4 h-4" />
+                                  </div>
+                                  <div className="flex-1 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-black uppercase tracking-wider text-[10px] text-slate-800 font-mono">
+                                        {isPending ? '⚠️ ตรวจพบข้อมูลซ้ำซ้อนหรือใกล้เคียงในระบบ' : '✓ ตรวจสอบความถูกต้องเสร็จสิ้นแล้ว'}
+                                      </p>
+                                    </div>
+                                    <p className="text-slate-500 font-medium text-[11px]">
+                                      {isPending 
+                                        ? `พบสินค้าในคลังปัจจุบันที่มีลักษณะใกล้เคียงกับข้อมูลในไฟล์: "${match.reason || ''}" กรุณาเลือกว่าเป็นชิ้นเดียวกัน หรือคนละชิ้นงาน?` 
+                                        : resolution?.type === 'same' 
+                                          ? `ยืนยัน "เป็นสินค้าชิ้นเดียวกัน" ระบบปรับรหัสซีเรียลจาก "${resolution.originalSerial}" เป็น "${resolution.correctedSerial}" ตรงกับคลังเพื่อเตรียมทำรายการ` 
+                                          : `ยืนยัน "เป็นสินค้าคนละชิ้นงาน" ระบบจะบันทึกรหัสซีเรียล "${resolution.originalSerial}" เป็นคีย์ชิ้นงานแยกใหม่โดยสมบูรณ์`}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1 text-[11px] font-mono">
+                                  <div className="border-2 border-slate-900 p-3 bg-red-50/10">
+                                    <p className="font-bold text-red-800 mb-1 font-sans text-[10px] uppercase">📦 ข้อมูลจากไฟล์ Invoice</p>
+                                    <p><strong>Serial No:</strong> <span className="bg-red-100 px-1 font-bold">{resolution?.originalSerial || item.serialNo}</span></p>
+                                    <p className="truncate"><strong>Description:</strong> {item.description}</p>
+                                    <p><strong>Part Reference:</strong> {item.partNo || 'N/A'}</p>
+                                  </div>
+                                  {match && (
+                                    <div className="border-2 border-slate-900 p-3 bg-emerald-50/10">
+                                      <p className="font-bold text-emerald-800 mb-1 font-sans text-[10px] uppercase">🏛️ ข้อมูลจริงในคลังสินค้า (System Inventory)</p>
+                                      <p><strong>Serial No:</strong> <span className="bg-emerald-100 px-1 font-bold">{match.existing.serialNo}</span></p>
+                                      <p className="truncate"><strong>Description:</strong> {match.existing.description}</p>
+                                      <p><strong>Part Reference:</strong> {match.existing.partNo || 'N/A'}</p>
+                                      <p><strong>Status:</strong> <span className={cn(
+                                        "px-1 text-[9px] font-bold uppercase",
+                                        match.existing.status === 'IN' ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+                                      )}>{match.existing.status}</span></p>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex gap-2 justify-end pt-1">
+                                  {isPending ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleResolveSeparate(idx)}
+                                        className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border-2 border-slate-900 font-sans font-black text-[10px] uppercase cursor-pointer rounded-none transition-all active:translate-y-0.5 active:shadow-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+                                      >
+                                        เป็นคนละชิ้นกัน (Separate Item)
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleResolveSame(idx, match.existing.serialNo)}
+                                        className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 border-2 border-slate-900 font-sans font-black text-[10px] uppercase cursor-pointer rounded-none transition-all active:translate-y-0.5 active:shadow-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+                                      >
+                                        เป็นสินค้าชิ้นเดียวกัน (Merge / Same Item)
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (resolution?.type === 'same' && resolution.originalSerial) {
+                                          const updatedItems = [...extractedData.items];
+                                          updatedItems[idx].serialNo = resolution.originalSerial;
+                                          setExtractedData({ ...extractedData, items: updatedItems });
+                                        }
+                                        setResolutions(prev => {
+                                          const newRes = { ...prev };
+                                          delete newRes[idx];
+                                          return newRes;
+                                        });
+                                      }}
+                                      className="px-3 py-1 bg-white text-rose-600 border border-slate-300 hover:border-rose-600 font-sans font-bold text-[9px] uppercase cursor-pointer transition-all"
+                                    >
+                                      Reset / ดึงค่ากลับเพื่อแก้ไข
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -46,6 +46,7 @@ export function InventoryList() {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [selectedLocation, setSelectedLocation] = useState<string>('ALL');
+  const [selectedSegment, setSelectedSegment] = useState<string>('ALL');
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [tempItem, setTempItem] = useState<InventoryItem | null>(null);
@@ -70,6 +71,11 @@ export function InventoryList() {
     new Set(items.map(i => i.currentLocation).filter(Boolean))
   ).sort() as string[];
 
+  // ดึงรายชื่อ Segment ทั้งหมดที่มี และจัดเรียงให้สวยงาม
+  const uniqueSegments = Array.from(
+    new Set(items.map(i => i.segment).filter(Boolean))
+  ).sort() as string[];
+
   const filtered = items.filter(i => {
     const matchesSearch = 
       i.serialNo.toLowerCase().includes(search.toLowerCase()) || 
@@ -78,13 +84,18 @@ export function InventoryList() {
       (i.invoiceNo || '').toLowerCase().includes(search.toLowerCase()) ||
       (i.customEntry || '').toLowerCase().includes(search.toLowerCase()) ||
       (i.customsStatus || '').toLowerCase().includes(search.toLowerCase()) ||
-      (i.ibase || '').toLowerCase().includes(search.toLowerCase());
+      (i.ibase || '').toLowerCase().includes(search.toLowerCase()) ||
+      (i.segment || '').toLowerCase().includes(search.toLowerCase());
 
     const matchesLocation = 
       selectedLocation === 'ALL' || 
       i.currentLocation === selectedLocation;
 
-    return matchesSearch && matchesLocation;
+    const matchesSegment =
+      selectedSegment === 'ALL' ||
+      i.segment === selectedSegment;
+
+    return matchesSearch && matchesLocation && matchesSegment;
   });
 
   const toggleSelect = (serialNo: string, e?: React.MouseEvent) => {
@@ -159,7 +170,7 @@ export function InventoryList() {
           <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 opacity-20 group-focus-within:opacity-100 transition-opacity" />
           <input 
             type="text" 
-            placeholder="Search Serial / Part / Desc / Invoice..."
+            placeholder="Search Serial / Part / Desc / Invoice / Segment..."
             className="pl-12 pr-6 py-4 bg-white border-2 border-slate-900 text-[10px] uppercase tracking-widest focus:outline-none focus:border-blue-600 w-full transition-all font-black"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -197,77 +208,119 @@ export function InventoryList() {
         </div>
       </div>
 
-      {/* Location Filter Bar extracted from imported CIPL location parameters */}
-      <div className="bg-white border-2 border-slate-900 p-4 neo-brutalism-shadow flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
-          <span className="text-[9.5px] uppercase font-black tracking-widest text-slate-500 flex items-center gap-1.5 whitespace-nowrap shrink-0">
-            <MapPin className="w-4 h-4 text-blue-600" />
-            สถานที่จัดเก็บ (LOCATION FILTER):
-          </span>
-          <div className="relative flex-1 max-w-sm sm:max-w-md">
-            <select
-              value={selectedLocation}
-              onChange={(e) => setSelectedLocation(e.target.value)}
-              className="appearance-none px-4 py-2 pr-10 bg-white border-2 border-slate-900 font-mono text-[10px] font-black uppercase focus:outline-none focus:border-blue-600 transition-colors w-full cursor-pointer h-[38px] rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
-            >
-              <option value="ALL">★ สรุปทั้งหมดในระบบ (SHOW ALL LOCATIONS)</option>
-              {uniqueLocations.map(loc => (
-                <option key={loc} value={loc}>
-                  {loc.toUpperCase()}
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-700 border-l-2 border-slate-900">
-              <Filter className="w-3.5 h-3.5" />
+      {/* Filters (Location & Segment) with Neo-brutalism layout */}
+      <div className="bg-white border-2 border-slate-900 p-4 neo-brutalism-shadow space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Location Filter */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <span className="text-[9.5px] uppercase font-black tracking-widest text-slate-500 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+              <MapPin className="w-4 h-4 text-blue-600" />
+              สถานที่จัดเก็บ (LOCATION):
+            </span>
+            <div className="relative flex-1">
+              <select
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                className="appearance-none px-4 py-2 pr-10 bg-white border-2 border-slate-900 font-mono text-[10px] font-black uppercase focus:outline-none focus:border-blue-600 transition-colors w-full cursor-pointer h-[38px] rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+              >
+                <option value="ALL">★ สรุปทั้งหมดในระบบ (SHOW ALL LOCATIONS)</option>
+                {uniqueLocations.map(loc => (
+                  <option key={loc} value={loc}>
+                    {loc.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-700 border-l-2 border-slate-900">
+                <Filter className="w-3.5 h-3.5" />
+              </div>
             </div>
+            
+            {selectedLocation !== 'ALL' && (
+              <button
+                onClick={() => setSelectedLocation('ALL')}
+                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border-2 border-slate-900 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+                title="ล้างส่วนกรองสถานที่"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>ล้าง</span>
+              </button>
+            )}
           </div>
-          
-         {selectedLocation !== 'ALL' && (
-            <button
-              onClick={() => setSelectedLocation('ALL')}
-              className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border-2 border-slate-900 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span>ล้างตัวกรอง</span>
-            </button>
-          )}
+
+          {/* Segment Filter */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <span className="text-[9.5px] uppercase font-black tracking-widest text-slate-500 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+              <Activity className="w-4 h-4 text-purple-600" />
+              เซกเมนต์สินค้า (SEGMENT):
+            </span>
+            <div className="relative flex-1">
+              <select
+                value={selectedSegment}
+                onChange={(e) => setSelectedSegment(e.target.value)}
+                className="appearance-none px-4 py-2 pr-10 bg-white border-2 border-slate-900 font-mono text-[10px] font-black uppercase focus:outline-none focus:border-blue-600 transition-colors w-full cursor-pointer h-[38px] rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+              >
+                <option value="ALL">★ เซกเมนต์ทั้งหมดในระบบ (SHOW ALL SEGMENTS)</option>
+                {uniqueSegments.map(seg => (
+                  <option key={seg} value={seg}>
+                    {seg.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-700 border-l-2 border-slate-900">
+                <Filter className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            
+            {selectedSegment !== 'ALL' && (
+              <button
+                onClick={() => setSelectedSegment('ALL')}
+                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border-2 border-slate-900 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+                title="ล้างส่วนกรองเซกเมนต์"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>ล้าง</span>
+              </button>
+            )}
+          </div>
         </div>
-        
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0 mt-4 md:mt-0">
-          <button
-            onClick={() => {
-              const tsv = generateItemsTSV(filtered);
-              navigator.clipboard.writeText(tsv)
-                .then(() => {
-                  setCopyNotification(`คัดลอกข้อมูลสินค้า ${filtered.length} รายการสำเร็จ! สามารถเปิด Excel หรือ Google Sheets แล้วกด Ctrl+V เพื่อวางข้อมูลได้ทันที`);
-                  setTimeout(() => setCopyNotification(null), 6000);
-                })
-                .catch(err => {
-                  console.error('Failed to copy TSV:', err);
-                  alert('ไม่สามารถคัดลอกข้อมูลอัตโนมัติได้ กรุณาลองใหม่อีกครั้ง');
-                });
-            }}
-            className="px-4 py-2 border-2 border-slate-900 bg-amber-400 hover:bg-amber-500 text-slate-900 font-extrabold text-[9px] uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
-            title="คัดลอกข้อมูลตารางเพื่อไปวางใน Excel (Copy for Excel Paste)"
-          >
-            <Check className="w-3.5 h-3.5 text-slate-950" />
-            <span>คัดลอกข้อมูลสำหรับวาง Excel ({filtered.length})</span>
-          </button>
 
-          <button
-            onClick={() => exportItemsToExcel(filtered, `inventory_${selectedLocation.toLowerCase()}_export.xlsx`)}
-            className="px-4 py-2 border-2 border-slate-900 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
-            title="ส่งออกรายการสินค้าทั้งหมดที่แสดงอยู่ในตัวกรองนี้ไปยังไฟล์ Excel (Download Master File)"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>ดาวน์โหลดไฟล์ Excel</span>
-          </button>
+        {/* Dynamic Options and Summary Action Toolbar */}
+        <div className="pt-2 border-t border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => {
+                const tsv = generateItemsTSV(filtered);
+                navigator.clipboard.writeText(tsv)
+                  .then(() => {
+                    setCopyNotification(`คัดลอกข้อมูลสินค้า ${filtered.length} รายการสำเร็จ! สามารถเปิด Excel หรือ Google Sheets แล้วกด Ctrl+V เพื่อวางข้อมูลได้ทันที`);
+                    setTimeout(() => setCopyNotification(null), 6000);
+                  })
+                  .catch(err => {
+                    console.error('Failed to copy TSV:', err);
+                    alert('ไม่สามารถคัดลอกข้อมูลอัตโนมัติได้ กรุณาลองใหม่อีกครั้ง');
+                  });
+              }}
+              className="px-4 py-2 border-2 border-slate-900 bg-amber-400 hover:bg-amber-500 text-slate-900 font-extrabold text-[9px] uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+              title="คัดลอกข้อมูลตารางเพื่อไปวางใน Excel (Copy for Excel Paste)"
+            >
+              <Check className="w-3.5 h-3.5 text-slate-950" />
+              <span>คัดลอกข้อมูลสำหรับวาง Excel ({filtered.length})</span>
+            </button>
 
+            <button
+              onClick={() => exportItemsToExcel(filtered, `inventory_${selectedLocation.toLowerCase()}_${selectedSegment.toLowerCase()}_export.xlsx`)}
+              className="px-4 py-2 border-2 border-slate-900 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+              title="ส่งออกรายการสินค้าทั้งหมดที่แสดงอยู่ในตัวกรองนี้ไปยังไฟล์ Excel (Download Filtered File)"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>ดาวน์โหลดไฟล์ Excel</span>
+            </button>
+          </div>
 
           <div className="text-left md:text-right shrink-0">
             <span className="text-[8px] uppercase font-black text-slate-400 block tracking-[0.2em] mb-0.5">Matched count</span>
-            <span className="text-base font-black font-mono text-slate-800 bg-slate-50 px-2 py-1 border border-slate-200 block">
-              {filtered.length} / {items.length}
+            <span className="text-xs font-black font-mono text-slate-800 bg-slate-50 px-2.5 py-1.5 border border-slate-200 block min-w-[70px] text-center">
+              {filtered.length} / {items.length} รายการ
             </span>
           </div>
         </div>
@@ -425,15 +478,18 @@ export function InventoryList() {
                               </td>
 
                               {/* Status / Location */}
-                              <td className="px-4 py-3">
-                                <div className="flex items-center justify-center gap-2">
+                              <td className="px-4 py-3 max-w-[240px]">
+                                <div className="flex items-center justify-center gap-1.5 min-w-0">
                                   <span className={cn(
                                     "inline-flex items-center gap-1.5 px-2 py-0.5 border-2 font-black text-[8px] uppercase tracking-tighter shrink-0",
                                     item.status === 'IN' ? 'border-emerald-600 bg-emerald-55 text-emerald-600' : 'border-red-600 bg-red-55 text-red-600'
                                   )}>
                                     {item.status}
                                   </span>
-                                  <span className="text-[10px] font-bold text-slate-600 border border-slate-300 bg-slate-50 px-1.5 py-0.5">
+                                  <span 
+                                    className="text-[9.5px] font-bold text-slate-600 border border-slate-300 bg-slate-50 px-1.5 py-0.5 max-w-[120px] sm:max-w-[150px] md:max-w-[180px] truncate block cursor-help select-all shrink"
+                                    title={item.currentLocation}
+                                  >
                                     {item.currentLocation}
                                   </span>
                                   {item.customsStatus && (
@@ -859,12 +915,16 @@ export function InventoryList() {
                       />
                     </div>
 
-                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                     <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
                       <label className="text-[8.5px] text-blue-600 font-bold block">หมายเลขสำแดง (CUSTOMS ENTRY)</label>
                       <input 
                         type="text" 
-                        value={tempItem.customEntry || ''} 
-                        onChange={(e) => setTempItem({ ...tempItem, customEntry: e.target.value })}
+                        value={tempItem.customEntry || tempItem.importEntryNo || ''} 
+                        onChange={(e) => setTempItem({ 
+                          ...tempItem, 
+                          customEntry: e.target.value, 
+                          importEntryNo: e.target.value 
+                        })}
                         className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
                         placeholder="เลขใบขนสินค้า เช่น A00..."
                       />
@@ -1711,7 +1771,7 @@ export function SettingsView() {
           dimension: getColIdx(['dimension', 'dimention', 'dimensions']),
           package: getColIdx(['package']),
           status: getColIdx(['status']),
-          customEntry: getColIdx(['custom entry', 'custom_entry']),
+          customEntry: getColIdx(['custom entry', 'custom_entry', 'import entry no', 'import entry', 'import_entry', 'entry no', 'entry_no']),
           destination: getColIdx(['destination', 'dest']),
           vessel: getColIdx(['vessel']),
           segment: getColIdx(['segment']),
@@ -1791,7 +1851,9 @@ export function SettingsView() {
             item.package = String(row[colIdxs.package] || '').trim();
           }
           if (colIdxs.customEntry !== -1 && row[colIdxs.customEntry] !== undefined) {
-            item.customEntry = String(row[colIdxs.customEntry] || '').trim();
+            const val = String(row[colIdxs.customEntry] || '').trim();
+            item.customEntry = val;
+            item.importEntryNo = val;
           }
           if (colIdxs.status !== -1 && row[colIdxs.status] !== undefined) {
             item.customsStatus = String(row[colIdxs.status] || '').trim();
