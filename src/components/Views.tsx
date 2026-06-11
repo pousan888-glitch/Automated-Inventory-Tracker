@@ -16,15 +16,27 @@ import {
   LayoutGrid,
   List,
   X,
-  ArrowRight
+  ArrowRight,
+  Download,
+  CheckSquare,
+  Square,
+  Save,
+  Check,
+  Upload,
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   subscribeToInventory, 
   subscribeToLogs, 
   InventoryItem, 
   TransactionLog,
-  wipeAllData 
+  wipeAllData,
+  updateInventoryItem,
+  importMasterInventory
 } from '../lib/inventoryService';
+import * as XLSX from 'xlsx';
+import { exportItemsToExcel, exportLogsToExcel, generateItemsTSV } from '../lib/exportUtils';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { HoldToConfirmButton } from './HoldToConfirmButton';
@@ -32,11 +44,18 @@ import { HoldToConfirmButton } from './HoldToConfirmButton';
 export function InventoryList() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [selectedLocation, setSelectedLocation] = useState<string>('ALL');
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [tempItem, setTempItem] = useState<InventoryItem | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [isLocationExpanded, setIsLocationExpanded] = useState(false);
+  const [selectedSerials, setSelectedSerials] = useState<string[]>([]);
+  const [modalTab, setModalTab] = useState<'profile' | 'history'>('profile');
+  const [copyNotification, setCopyNotification] = useState<string | null>(null);
+
 
   useEffect(() => {
     return subscribeToInventory(setItems);
@@ -55,7 +74,11 @@ export function InventoryList() {
     const matchesSearch = 
       i.serialNo.toLowerCase().includes(search.toLowerCase()) || 
       i.description.toLowerCase().includes(search.toLowerCase()) ||
-      i.partNo.toLowerCase().includes(search.toLowerCase());
+      i.partNo.toLowerCase().includes(search.toLowerCase()) ||
+      (i.invoiceNo || '').toLowerCase().includes(search.toLowerCase()) ||
+      (i.customEntry || '').toLowerCase().includes(search.toLowerCase()) ||
+      (i.customsStatus || '').toLowerCase().includes(search.toLowerCase()) ||
+      (i.ibase || '').toLowerCase().includes(search.toLowerCase());
 
     const matchesLocation = 
       selectedLocation === 'ALL' || 
@@ -64,14 +87,79 @@ export function InventoryList() {
     return matchesSearch && matchesLocation;
   });
 
+  const toggleSelect = (serialNo: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation(); // prevent opening details popup when checkbox clicked
+    setSelectedSerials(prev => {
+      if (prev.includes(serialNo)) {
+        return prev.filter(s => s !== serialNo);
+      } else {
+        return [...prev, serialNo];
+      }
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const filteredSerials = filtered.map(i => i.serialNo);
+    const allFilteredAreSelected = filteredSerials.every(serialNo => selectedSerials.includes(serialNo));
+
+    if (allFilteredAreSelected) {
+      // Unselect all of the filtered items
+      setSelectedSerials(prev => prev.filter(serialNo => !filteredSerials.includes(serialNo)));
+    } else {
+      // Add all filtered items to selection
+      setSelectedSerials(prev => {
+        const union = new Set([...prev, ...filteredSerials]);
+        return Array.from(union);
+      });
+    }
+  };
+
+  const allFilteredAreSelected = filtered.length > 0 && filtered.every(i => selectedSerials.includes(i.serialNo));
+  const someFilteredAreSelected = filtered.length > 0 && filtered.some(i => selectedSerials.includes(i.serialNo)) && !allFilteredAreSelected;
+
+  const handleSelectItem = (item: InventoryItem) => {
+    setSelectedItem(item);
+    setTempItem({ ...item });
+    setSaveSuccess(false);
+    setModalTab('profile');
+  };
+
+  const handleSaveItem = async () => {
+    if (!tempItem) return;
+    setIsSaving(true);
+    setSaveSuccess(false);
+    try {
+      await updateInventoryItem(tempItem);
+      setSaveSuccess(true);
+      // Automatically clear save notice after 3 seconds
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error("Error saving item configuration profile: ", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+
   return (
     <div className="space-y-8">
+      {copyNotification && (
+        <div className="fixed top-6 right-6 bg-slate-900 border-4 border-amber-400 max-w-sm p-4 z-[9999] neo-brutalism-shadow flex items-start gap-3 text-white duration-300">
+          <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-sans text-xs font-black uppercase tracking-wider text-amber-400">คัดลอกข้อมูลสำเร็จ (Copy Successful)</h4>
+            <p className="font-sans text-[11px] font-bold text-slate-200 mt-1">
+              {copyNotification}
+            </p>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="relative group flex-1 max-w-md">
           <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 opacity-20 group-focus-within:opacity-100 transition-opacity" />
           <input 
             type="text" 
-            placeholder="Search Serial / Part / Desc..."
+            placeholder="Search Serial / Part / Desc / Invoice..."
             className="pl-12 pr-6 py-4 bg-white border-2 border-slate-900 text-[10px] uppercase tracking-widest focus:outline-none focus:border-blue-600 w-full transition-all font-black"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -134,7 +222,7 @@ export function InventoryList() {
             </div>
           </div>
           
-          {selectedLocation !== 'ALL' && (
+         {selectedLocation !== 'ALL' && (
             <button
               onClick={() => setSelectedLocation('ALL')}
               className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border-2 border-slate-900 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
@@ -145,11 +233,43 @@ export function InventoryList() {
           )}
         </div>
         
-        <div className="text-left md:text-right shrink-0">
-          <span className="text-[8px] uppercase font-black text-slate-400 block tracking-[0.2em] mb-0.5">Matched count</span>
-          <span className="text-base font-black font-mono text-slate-800 bg-slate-50 px-2 py-1 border border-slate-200">
-            {filtered.length} / {items.length}
-          </span>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0 mt-4 md:mt-0">
+          <button
+            onClick={() => {
+              const tsv = generateItemsTSV(filtered);
+              navigator.clipboard.writeText(tsv)
+                .then(() => {
+                  setCopyNotification(`คัดลอกข้อมูลสินค้า ${filtered.length} รายการสำเร็จ! สามารถเปิด Excel หรือ Google Sheets แล้วกด Ctrl+V เพื่อวางข้อมูลได้ทันที`);
+                  setTimeout(() => setCopyNotification(null), 6000);
+                })
+                .catch(err => {
+                  console.error('Failed to copy TSV:', err);
+                  alert('ไม่สามารถคัดลอกข้อมูลอัตโนมัติได้ กรุณาลองใหม่อีกครั้ง');
+                });
+            }}
+            className="px-4 py-2 border-2 border-slate-900 bg-amber-400 hover:bg-amber-500 text-slate-900 font-extrabold text-[9px] uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+            title="คัดลอกข้อมูลตารางเพื่อไปวางใน Excel (Copy for Excel Paste)"
+          >
+            <Check className="w-3.5 h-3.5 text-slate-950" />
+            <span>คัดลอกข้อมูลสำหรับวาง Excel ({filtered.length})</span>
+          </button>
+
+          <button
+            onClick={() => exportItemsToExcel(filtered, `inventory_${selectedLocation.toLowerCase()}_export.xlsx`)}
+            className="px-4 py-2 border-2 border-slate-900 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+            title="ส่งออกรายการสินค้าทั้งหมดที่แสดงอยู่ในตัวกรองนี้ไปยังไฟล์ Excel (Download Master File)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>ดาวน์โหลดไฟล์ Excel</span>
+          </button>
+
+
+          <div className="text-left md:text-right shrink-0">
+            <span className="text-[8px] uppercase font-black text-slate-400 block tracking-[0.2em] mb-0.5">Matched count</span>
+            <span className="text-base font-black font-mono text-slate-800 bg-slate-50 px-2 py-1 border border-slate-200 block">
+              {filtered.length} / {items.length}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -159,69 +279,182 @@ export function InventoryList() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-900 text-white border-b-2 border-slate-900">
-                  <th className="px-8 py-5 text-[10px] uppercase font-black tracking-widest">Status</th>
-                  <th className="px-8 py-5 text-[10px] uppercase font-black tracking-widest">Serial No</th>
-                  <th className="px-8 py-5 text-[10px] uppercase font-black tracking-widest">Part Reference</th>
-                  <th className="px-8 py-5 text-[10px] uppercase font-black tracking-widest">Import Entry</th>
-                  <th className="px-8 py-5 text-[10px] uppercase font-black tracking-widest">Location</th>
-                  <th className="px-8 py-5 text-[10px] uppercase font-black tracking-widest text-right">Commit Time</th>
+                  <th className="px-4 py-4 w-12 text-center select-none font-black text-[10px] uppercase">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); toggleSelectAll(); }}
+                      className="p-1 text-white hover:text-emerald-400 font-black cursor-pointer"
+                      title="เลือกทั้งหมด"
+                    >
+                      {allFilteredAreSelected ? (
+                        <CheckSquare className="w-4.5 h-4.5 text-emerald-400" />
+                      ) : someFilteredAreSelected ? (
+                        <div className="w-4.5 h-4.5 border-2 border-amber-400 bg-amber-400/20 flex items-center justify-center">
+                          <div className="w-2.5 h-1 bg-amber-400 animate-pulse" />
+                        </div>
+                      ) : (
+                        <Square className="w-4.5 h-4.5" />
+                      )}
+                    </button>
+                  </th>
+                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200">IBASE</th>
+                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200 text-center">Line Item</th>
+                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200">Part No.</th>
+                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200">Serial No.</th>
+                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200">Description</th>
+                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200 text-center">QTY</th>
+                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200 text-center">Status / Location</th>
                 </tr>
               </thead>
-              <tbody className="divide-y-2 divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-24 text-center">
+                    <td colSpan={8} className="p-24 text-center">
                       <div className="flex flex-col items-center gap-2 opacity-20">
                         <Package className="w-16 h-16" />
                         <p className="text-sm uppercase font-black tracking-widest">Data_Buffer_Empty</p>
                       </div>
                     </td>
                   </tr>
-                ) : (
-                  filtered.map((item) => (
-                    <tr 
-                      key={item.serialNo} 
-                      className="hover:bg-slate-100/80 cursor-pointer transition-colors group"
-                      onClick={() => setSelectedItem(item)}
-                    >
-                      <td className="px-8 py-5">
-                        <span className={`inline-flex items-center gap-2 px-3 py-1 border-2 font-black text-[9px] uppercase tracking-tighter ${
-                          item.status === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-600'
-                        }`}>
-                          {item.status === 'IN' ? <ArrowDownLeft className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 text-xs font-black font-mono tracking-tighter text-slate-900">
-                        {item.serialNo}
-                      </td>
-                      <td className="px-8 py-5">
-                        <p className="text-[9px] uppercase opacity-40 font-black mb-1">{item.partNo}</p>
-                        <p className="text-[11px] font-bold tracking-tight uppercase truncate max-w-[200px]">{item.description}</p>
-                      </td>
-                      <td className="px-8 py-5">
-                        <p className="text-[11px] font-black text-blue-600 tracking-tighter italic">{item.importEntryNo || 'N/A'}</p>
-                        <p className="text-[9px] font-bold uppercase opacity-30 tracking-widest">Line {item.importEntryLineNo || '-'}</p>
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-3 h-3 opacity-20" />
-                          <span className="text-[10px] uppercase font-black tracking-widest">{item.currentLocation}</span>
-                        </div>
-                      </td>
-                      <td className="px-8 py-5 text-right">
-                        <div className="flex items-center justify-end gap-3 font-mono font-bold text-slate-400 group-hover:text-slate-900">
-                          <span className="text-[8px] font-sans font-black uppercase text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 px-2 py-0.5 border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
-                            ประวัติ ➔
-                          </span>
-                          <p className="text-[10px] italic">
-                            {item.lastUpdate?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} @ {item.lastUpdate?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ) : (() => {
+                  // Group items by file code / admin code (invoiceNo)
+                  const itemsByGroup: { [key: string]: InventoryItem[] } = {};
+                  filtered.forEach(item => {
+                    const groupName = item.invoiceNo || 'UNASSIGNED';
+                    if (!itemsByGroup[groupName]) {
+                      itemsByGroup[groupName] = [];
+                    }
+                    itemsByGroup[groupName].push(item);
+                  });
+
+                  const groups = Object.keys(itemsByGroup).sort((a, b) => {
+                    if (a === 'UNASSIGNED') return 1;
+                    if (b === 'UNASSIGNED') return -1;
+                    return a.localeCompare(b);
+                  });
+
+                  const groupColors = [
+                    { bg: 'bg-amber-50/90 text-amber-950 border-amber-300', tag: 'bg-amber-300 text-amber-950 border-amber-400' },
+                    { bg: 'bg-sky-50/90 text-sky-950 border-sky-300', tag: 'bg-sky-300 text-sky-950 border-sky-400' },
+                    { bg: 'bg-emerald-50/90 text-emerald-950 border-emerald-300', tag: 'bg-emerald-300 text-emerald-950 border-emerald-400' },
+                    { bg: 'bg-indigo-50/90 text-indigo-950 border-indigo-300', tag: 'bg-indigo-300 text-indigo-950 border-indigo-400' },
+                  ];
+
+                  return groups.map((groupName, groupIdx) => {
+                    const groupItems = itemsByGroup[groupName];
+                    const colorScheme = groupColors[groupIdx % groupColors.length];
+                    
+                    return (
+                      <React.Fragment key={groupName}>
+                        {/* Group Header Row */}
+                        <tr className={cn("border-y-2 border-slate-900/10 font-bold", colorScheme.bg)}>
+                          <td colSpan={8} className="px-4 py-2.5 align-middle select-none">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className={cn("px-2.5 py-1 text-[11px] font-black uppercase tracking-widest border-2 border-slate-900", colorScheme.tag)}>
+                                  📂 {groupName === 'UNASSIGNED' ? 'ไม่มีรหัสไฟล์ / UNASSIGNED' : `ไฟล์: ${groupName}`}
+                                </span>
+                                <span className="text-[10px] text-slate-700 font-extrabold bg-white/60 px-2 py-0.5 border border-slate-400/30">
+                                  สินค้าในไฟล์นี้ {groupItems.length} รายการ
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Group Item Rows */}
+                        {groupItems.map((item) => {
+                          const isChecked = selectedSerials.includes(item.serialNo);
+                          return (
+                            <tr 
+                              key={item.serialNo} 
+                              className={cn(
+                                "hover:bg-slate-100 cursor-pointer border-b border-slate-200 transition-colors group",
+                                isChecked ? "bg-blue-50/30" : ""
+                              )}
+                              onClick={() => handleSelectItem(item)}
+                            >
+                              {/* Checkbox */}
+                              <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <button 
+                                  onClick={(e) => toggleSelect(item.serialNo, e)}
+                                  className="p-1 hover:scale-110 transition-transform cursor-pointer"
+                                >
+                                  {isChecked ? (
+                                    <CheckSquare className="w-4.5 h-4.5 text-blue-600 fill-blue-50" />
+                                  ) : (
+                                    <Square className="w-4.5 h-4.5 text-slate-300 hover:text-slate-500" />
+                                  )}
+                                </button>
+                              </td>
+
+                              {/* IBASE */}
+                              <td className="px-4 py-3 text-[11px] font-mono font-black tracking-tight text-slate-755 select-all">
+                                {item.ibase || '-'}
+                              </td>
+
+                              {/* Line Item */}
+                              <td className="px-4 py-3 text-center text-xs font-mono font-bold text-slate-500">
+                                {item.lineItem || '-'}
+                              </td>
+
+                              {/* Part No */}
+                              <td className="px-4 py-3 text-xs font-mono font-black tracking-tighter text-slate-800 break-all select-all">
+                                {item.partNo || 'N/A'}
+                              </td>
+
+                              {/* Serial No */}
+                              <td className="px-4 py-3 text-xs font-sans font-black tracking-tighter text-blue-600 break-all select-all">
+                                {item.serialNo || 'N/A'}
+                              </td>
+
+                              {/* Description */}
+                              <td className="px-4 py-3 max-w-[320px]">
+                                <p className="text-[11.5px] font-bold text-slate-900 leading-snug truncate" title={item.description}>
+                                  {item.description}
+                                </p>
+                                {item.meaningInThai && (
+                                  <p className="text-[10px] font-medium text-slate-500 mt-0.5 truncate" title={item.meaningInThai}>
+                                    แปล: {item.meaningInThai}
+                                  </p>
+                                )}
+                              </td>
+
+                              {/* QTY */}
+                              <td className="px-4 py-3 text-center text-xs font-mono font-bold text-slate-800">
+                                {item.qty !== undefined ? item.qty : 1}
+                              </td>
+
+                              {/* Status / Location */}
+                              <td className="px-4 py-3">
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className={cn(
+                                    "inline-flex items-center gap-1.5 px-2 py-0.5 border-2 font-black text-[8px] uppercase tracking-tighter shrink-0",
+                                    item.status === 'IN' ? 'border-emerald-600 bg-emerald-55 text-emerald-600' : 'border-red-600 bg-red-55 text-red-600'
+                                  )}>
+                                    {item.status}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-slate-600 border border-slate-300 bg-slate-50 px-1.5 py-0.5">
+                                    {item.currentLocation}
+                                  </span>
+                                  {item.customsStatus && (
+                                    <span className={cn(
+                                      "inline-flex items-center px-1.5 py-0.5 border text-[9px] font-black uppercase tracking-tighter shrink-0",
+                                      item.customsStatus.toLowerCase() === 'fz' ? 'border-orange-550 bg-orange-100 text-orange-800' :
+                                      item.customsStatus.toLowerCase() === 'drawback' ? 'border-rose-550 bg-rose-100 text-rose-800' :
+                                      'border-blue-550 bg-blue-100 text-blue-800'
+                                    )}>
+                                      {item.customsStatus}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           </div>
@@ -237,72 +470,91 @@ export function InventoryList() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                {filtered.map((item) => (
-                  <div 
-                    key={item.serialNo}
-                    className="bg-white border-2 border-slate-900 p-4 neo-brutalism-shadow hover:translate-y-[-2px] hover:translate-x-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] transition-all flex flex-col justify-between group relative min-h-[160px] cursor-pointer"
-                    onClick={() => setSelectedItem(item)}
-                  >
-                    <div>
-                      {/* Header status and location */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 border-2 font-black text-[8px] uppercase tracking-tighter ${
-                          item.status === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-600'
-                        }`}>
-                          {item.status === 'IN' ? <ArrowDownLeft className="w-2.5 h-2.5" /> : <ArrowUpRight className="w-2.5 h-2.5" />}
-                          {item.status}
-                        </span>
-                        
-                        <div className="flex items-center gap-1 max-w-[60%]">
-                          <MapPin className="w-2.5 h-2.5 opacity-30 shrink-0" />
-                          <span className="text-[8.5px] uppercase font-black tracking-widest truncate" title={item.currentLocation}>
-                            {item.currentLocation}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Serial Number (Asset ID) */}
-                      <p className="text-[11px] font-black font-mono tracking-tighter text-slate-900 break-all bg-slate-50 border-2 border-slate-900/10 px-2 py-0.5 mb-2 leading-none">
-                        {item.serialNo}
-                      </p>
-
-                      {/* Description and Part */}
-                      <div className="space-y-0.5">
-                        <p className="text-[8px] uppercase opacity-50 font-black tracking-tight">{item.partNo || 'NO PART REF'}</p>
-                        <p className="text-[9.5px] font-bold tracking-tight uppercase line-clamp-2 leading-tight text-slate-800" title={item.description}>
-                          {item.description}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Footer entry and timing */}
-                    <div className="mt-4 pt-2 border-t-2 border-slate-100 flex flex-col gap-1.5">
-                      {item.importEntryNo ? (
-                        <div className="flex items-center justify-between text-[8px] gap-2">
-                          <span className="font-black text-blue-600 truncate italic">
-                            IE: {item.importEntryNo}
-                          </span>
-                          <span className="font-bold uppercase opacity-45 shrink-0">
-                            Line: {item.importEntryLineNo || '-'}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="text-[8px] opacity-25 uppercase font-mono italic">
-                          No Import Entry
-                        </div>
+                {filtered.map((item) => {
+                  const isChecked = selectedSerials.includes(item.serialNo);
+                  return (
+                    <div 
+                      key={item.serialNo}
+                      className={cn(
+                        "bg-white border-2 border-slate-900 p-4 neo-brutalism-shadow hover:translate-y-[-2px] hover:translate-x-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] transition-all flex flex-col justify-between group relative min-h-[175px] cursor-pointer",
+                        isChecked ? "border-blue-600 bg-blue-50/10 shadow-[3px_3px_0px_0px_rgba(37,99,235,1)]" : ""
                       )}
-                      
-                      <div className="text-[8.5px] font-mono font-bold text-slate-400 text-right flex items-center justify-between gap-1 leading-none mt-1">
-                        <span className="text-blue-600 font-sans font-black uppercase opacity-0 group-hover:opacity-100 transition-opacity text-[7.5px] tracking-wider shrink-0">
-                          ดูประวัติ ➔
-                        </span>
-                        <span className="text-right">
-                          {item.lastUpdate?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} @ {item.lastUpdate?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                        </span>
+                      onClick={() => handleSelectItem(item)}
+                    >
+                      <div>
+                        {/* Header status and location */}
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={(e) => toggleSelect(item.serialNo, e)}
+                              className="p-0.5 text-slate-400 hover:text-blue-600 cursor-pointer"
+                              title="เลือกรายการสินค้า"
+                            >
+                              {isChecked ? (
+                                <CheckSquare className="w-4 h-4 text-blue-600 fill-blue-50" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-300 hover:text-slate-400" />
+                              )}
+                            </button>
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 border-2 font-black text-[8px] uppercase tracking-tighter ${
+                              item.status === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-600'
+                            }`}>
+                              {item.status === 'IN' ? <ArrowDownLeft className="w-2.5 h-2.5" /> : <ArrowUpRight className="w-2.5 h-2.5" />}
+                              {item.status}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-1 max-w-[60%]">
+                            <MapPin className="w-2.5 h-2.5 opacity-30 shrink-0" />
+                            <span className="text-[8.5px] uppercase font-black tracking-widest truncate" title={item.currentLocation}>
+                              {item.currentLocation}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Serial Number (Asset ID) */}
+                        <p className="text-[11px] font-black font-mono tracking-tighter text-slate-900 break-all bg-slate-50 border-2 border-slate-900/10 px-2 py-0.5 mb-2 leading-none">
+                          {item.serialNo}
+                        </p>
+
+                        {/* Description and Part */}
+                        <div className="space-y-0.5">
+                          <p className="text-[8px] uppercase opacity-50 font-black tracking-tight">{item.partNo || 'NO PART REF'}</p>
+                          <p className="text-[9.5px] font-bold tracking-tight uppercase line-clamp-2 leading-tight text-slate-800" title={item.description}>
+                            {item.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Footer entry and timing */}
+                      <div className="mt-4 pt-2 border-t-2 border-slate-100 flex flex-col gap-1.5">
+                        {item.importEntryNo ? (
+                          <div className="flex items-center justify-between text-[8px] gap-2">
+                            <span className="font-black text-blue-600 truncate italic">
+                              IE: {item.importEntryNo}
+                            </span>
+                            <span className="font-bold uppercase opacity-45 shrink-0">
+                              Line: {item.importEntryLineNo || '-'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-[8px] opacity-25 uppercase font-mono italic">
+                            No Import Entry
+                          </div>
+                        )}
+                        
+                        <div className="text-[8.5px] font-mono font-bold text-slate-400 text-right flex items-center justify-between gap-1 leading-none mt-1">
+                          <span className="text-blue-600 font-sans font-black uppercase opacity-0 group-hover:opacity-100 transition-opacity text-[7.5px] tracking-wider shrink-0">
+                            ดูประวัติ ➔
+                          </span>
+                          <span className="text-right">
+                            {item.lastUpdate?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} @ {item.lastUpdate?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -314,192 +566,502 @@ export function InventoryList() {
         </div>
       </div>
 
-      {/* Pop-up Modal to show item transport history trail */}
-      {selectedItem && (
+      {/* Floating Selection Action Panel */}
+      {selectedSerials.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border-4 border-slate-900 text-white p-4 flex flex-col md:flex-row items-center justify-between gap-4 z-50 shadow-[4px_4px_0px_0px_rgba(244,63,94,1)] w-[90%] max-w-2xl select-none">
+          <div className="flex items-center gap-3">
+            <span className="px-2.5 py-1 bg-emerald-500 text-slate-950 font-mono text-[10px] font-black tracking-tight border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
+              เลือก {selectedSerials.length} ชิ้น
+            </span>
+            <p className="text-[9.5px] font-black uppercase tracking-wider text-slate-350 hidden md:block">
+              ตรวจสอบแล้ว {selectedSerials.length} รายการ ➔ สั่งทำการเขียนสเปค Excel ได้ทันที
+            </p>
+          </div>
+          <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                const selectedItems = items.filter(item => selectedSerials.includes(item.serialNo));
+                const tsv = generateItemsTSV(selectedItems);
+                navigator.clipboard.writeText(tsv)
+                  .then(() => {
+                    setCopyNotification(`คัดลอกข้อมูลสินค้าที่เลือก ${selectedItems.length} รายการแล้ว! สามารถกด Ctrl+V เพื่อวางใน Excel ได้ทันที`);
+                    setTimeout(() => setCopyNotification(null), 6000);
+                  })
+                  .catch(err => {
+                    console.error('Failed to copy selected TSV:', err);
+                    alert('คัดลอกไม่สำเร็จ กรุณาลองอีกครั้ง');
+                  });
+              }}
+              className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-[9.5px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] active:translate-x-0.5 active:translate-y-0.5"
+              title="คัดลอกข้อมูลเฉพาะส่วนที่ท่านเลือกไปวางใน Excel (Copy Selected to Excel)"
+            >
+              <Check className="w-3.5 h-3.5 text-slate-950" />
+              <span>คัดลอกสำหรับ Excel ({selectedSerials.length} ชิ้น)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const selectedItems = items.filter(item => selectedSerials.includes(item.serialNo));
+                exportItemsToExcel(selectedItems, `selected_admin_export_${selectedSerials.length}_items.xlsx`);
+              }}
+              className="px-4 py-2 bg-emerald-550 hover:bg-emerald-650 text-white font-black text-[9.5px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] active:translate-x-0.5 active:translate-y-0.5"
+              title="ส่งออกแบบฟูลออฟชั่น เฉพาะตัวที่ท่านติ๊กเลือก"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>ดึงออกใส่ Excel</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedSerials([])}
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-black text-[9px] uppercase tracking-widest cursor-pointer border border-slate-700"
+            >
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up Administrative Modal Panel (Tabbed & Form Editable) */}
+      {selectedItem && tempItem && (
         <div 
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
           onClick={() => {
             setSelectedItem(null);
+            setTempItem(null);
             setIsLocationExpanded(false);
           }}
         >
           <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white border-4 border-slate-900 p-6 md:p-8 w-full max-w-5xl neo-brutalism-shadow relative h-[92vh] max-h-[92vh] flex flex-col"
+            className="bg-white border-4 border-slate-900 w-full max-w-5xl neo-brutalism-shadow relative my-8 flex flex-col max-h-[90vh] overflow-hidden rounded-none shadow-[6px_6px_0px_0px_rgba(15,23,42,1)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
             <button 
               onClick={() => {
                 setSelectedItem(null);
+                setTempItem(null);
                 setIsLocationExpanded(false);
               }}
-              className="absolute top-4 right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1.5 transition-colors neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+              className="absolute top-4 right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1.5 transition-colors neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 z-10 cursor-pointer"
               aria-label="Close dialog"
             >
               <X className="w-5 h-5" />
             </button>
 
-            {/* Modal Heading */}
-            <div className="mb-6">
-              <span className="text-[9px] uppercase font-black text-blue-600 tracking-widest bg-blue-50 px-2.5 py-1 border-2 border-slate-900 leading-none inline-block mb-2">
-                ประวัติการเคลื่อนย้ายสินทรัพย์ (Asset Trail)
-              </span>
-              <h3 className="text-xl md:text-2xl font-black font-mono tracking-tighter text-slate-900 break-all bg-slate-105 border-2 border-slate-900 px-4 py-2 mt-1">
-                {selectedItem.serialNo}
+            {/* Modal Heading Header */}
+            <div className="bg-slate-900 text-white p-6 pr-16 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="text-[9px] uppercase font-black bg-blue-600 text-white px-2 py-0.5 border border-blue-400 font-mono tracking-widest">
+                  แผงควบคุมหลักฝ่ายแอดมิน (CIPL PROFILE WORKSPACE)
+                </span>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 border border-white font-black text-[9px] uppercase ${
+                  tempItem.status === 'IN' ? 'bg-emerald-600' : 'bg-red-600'
+                }`}>
+                  {tempItem.status}
+                </span>
+              </div>
+              <h3 className="text-xl md:text-2xl font-black font-mono tracking-tighter uppercase break-all">
+                {tempItem.serialNo}
               </h3>
             </div>
 
-            {/* Asset Profile Info Brief */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-slate-50 p-4 border-2 border-slate-900 mb-4 text-xs font-bold uppercase tracking-tight">
-              <div className="space-y-1 md:col-span-8">
-                <p className="text-[8.5px] text-slate-400 font-black">รายละเอียดสินค้า (Description):</p>
-                <p className="text-slate-800 leading-snug">{selectedItem.description || '-'}</p>
-              </div>
-              <div className="space-y-1 md:col-span-4">
-                <p className="text-[8.5px] text-slate-400 font-black">รหัสอ้างอิง (Part No):</p>
-                <p className="text-slate-800 font-mono text-[11px]">{selectedItem.partNo || '-'}</p>
-              </div>
-              <div className="space-y-1 md:col-span-3">
-                <p className="text-[8.5px] text-slate-400 font-black">สถานะปัจจุบัน (Status):</p>
-                <div>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 border-2 font-black text-[9px] leading-normal uppercase ${
-                    selectedItem.status === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-600'
-                  }`}>
-                    {selectedItem.status === 'IN' ? <ArrowDownLeft className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
-                    {selectedItem.status}
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-1 md:col-span-9">
-                <p className="text-[8.5px] text-slate-400 font-black">ตำแหน่งพิกัดสินค้า (Current Location):</p>
-                <div 
-                  className={cn(
-                    "text-slate-800 flex items-start gap-2 p-1.5 rounded-sm cursor-pointer transition-all border-2 min-h-[34px]",
-                    isLocationExpanded 
-                      ? "bg-slate-100/40 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]" 
-                      : "bg-white border-slate-900/10 hover:border-slate-900"
-                  )}
-                  onClick={() => setIsLocationExpanded(!isLocationExpanded)}
-                  title={isLocationExpanded ? "คลิกเพื่อย่อ" : "คลิกเพื่อดูข้อความเต็ม"}
-                >
-                  <MapPin className="w-3.5 h-3.5 opacity-50 shrink-0 text-blue-600 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      "text-[10px] md:text-xs font-black text-slate-800 leading-tight tracking-wide", 
-                      isLocationExpanded ? "" : "truncate max-w-full"
-                    )}>
-                      {selectedItem.currentLocation || '-'}
-                    </p>
-                    {selectedItem.currentLocation && selectedItem.currentLocation.length > 30 && (
-                      <span className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-1 inline-flex items-center gap-1 leading-none rounded-sm px-1.5 py-0.5 bg-blue-50 border border-blue-200">
-                        {isLocationExpanded ? "✖ คลิกเพื่อย่อลง" : "➔ คลิกเพื่อขยายเป็นข้อความเต็ม"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
+            {/* Navigation Tab Heads */}
+            <div className="flex border-b-4 border-slate-900 bg-slate-100 font-black text-[10px] uppercase tracking-wider shrink-0 select-none">
+              <button
+                type="button"
+                onClick={() => setModalTab('profile')}
+                className={cn(
+                  "px-6 py-4 border-r-2 border-slate-900 transition-colors uppercase cursor-pointer flex-1 md:flex-none",
+                  modalTab === 'profile' ? "bg-white text-slate-900 border-b-[4px] border-b-blue-600" : "text-slate-500 hover:bg-slate-50"
+                )}
+              >
+                📝 รายละเอียดฝ่ายแอดมิน & การศุลกากร
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalTab('history')}
+                className={cn(
+                  "px-6 py-4 border-r-2 border-slate-900 transition-colors uppercase cursor-pointer flex-1 md:flex-none",
+                  modalTab === 'history' ? "bg-white text-slate-900 border-b-[4px] border-b-blue-600" : "text-slate-500 hover:bg-slate-50"
+                )}
+              >
+                🚚 บันทึกประวัติเคลื่อนย้าย ({logs.filter(log => log.serialNo?.trim() === selectedItem.serialNo?.trim()).length} รอบ)
+              </button>
             </div>
 
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900 mb-3 flex items-center gap-2">
-              <History className="w-4 h-4 opacity-70" />
-              <span>บันทึกการเดินทางเข้าออกคลัง (History Entries)</span>
-            </h4>
+            {/* Tab Panels Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+              {modalTab === 'profile' ? (
+                <div className="space-y-6">
+                  {/* Master Description Details Section */}
+                  <div className="bg-white border-2 border-slate-900 p-4 rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div className="md:col-span-8 space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black uppercase">รายละเอียดชิ้นส่วนอังกฤษ (DESCRIPTION)</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.description || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, description: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-950 font-sans text-xs font-bold uppercase focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                      />
+                    </div>
+                    <div className="md:col-span-4 space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black uppercase">รหัสชิ้นส่วนแบรนด์ (PART REF / NUMBER)</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.partNo || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, partNo: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-950 font-mono text-xs font-bold uppercase focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                      />
+                    </div>
+                  </div>
 
-            {/* Log Entries Viewport List */}
-            <div className="flex-1 overflow-y-auto pr-2 space-y-3 border-2 border-slate-900 bg-slate-50/70 p-4 neo-brutalism-shadow min-h-0">
-              {logs.filter(log => log.serialNo?.trim() === selectedItem.serialNo?.trim()).length === 0 ? (
-                <div className="p-12 text-center border-2 border-dashed border-slate-300 bg-white flex flex-col items-center gap-1 justify-center opacity-40">
-                  <Clock className="w-10 h-10" />
-                  <p className="text-[9.5px] font-black uppercase tracking-widest">No historical sync logs stored</p>
-                </div>
-              ) : (
-                logs
-                  .filter(log => log.serialNo?.trim() === selectedItem.serialNo?.trim())
-                  .sort((a, b) => {
-                    const timeA = a.date?.toDate ? a.date.toDate().getTime() : 0;
-                    const timeB = b.date?.toDate ? b.date.toDate().getTime() : 0;
-                    return timeB - timeA;
-                  })
-                  .map((log, index) => (
-                    <div 
-                      key={index} 
-                      className="bg-white border-2 border-slate-900 p-3.5 hover:bg-slate-50 hover:translate-y-[-1px] transition-all relative overflow-hidden flex flex-col md:flex-row md:items-center gap-2 md:gap-4 neo-brutalism-shadow-sm min-h-[55px]"
-                    >
-                      {/* Left vertical status indicator strip */}
-                      <div className={`w-1.5 h-full absolute left-0 top-0 ${log.transactionType === 'IN' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                      
-                      {/* Responsive Grid Layout for Info Fields */}
-                      <div className="pl-3 flex-1 grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 items-center">
-                        
-                        {/* Transaction Status (col-span-2) */}
-                        <div className="md:col-span-2 flex items-center gap-1.5">
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 border border-slate-900 font-black text-[8px] uppercase tracking-tighter ${
-                            log.transactionType === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-600'
-                          }`}>
-                            {log.transactionType}
-                          </span>
-                          <span className="text-[9.5px] font-mono font-bold text-slate-800 md:hidden">
-                            {log.date?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
-                          </span>
-                        </div>
+                  {/* Dense visual matrix layout for CIPL fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-blue-600 font-black block select-none">แปลภาษาไทย (MEANING IN THAI) ★</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.meaningInThai || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, meaningInThai: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                        placeholder="กรอกคำอธิบายภาษาไทย"
+                      />
+                    </div>
 
-                        {/* Date (col-span-2) */}
-                        <div className="hidden md:block md:col-span-2 leading-tight">
-                          <p className="text-[10px] font-mono font-black text-slate-800">
-                            {log.date?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
-                          </p>
-                          <p className="text-[8.5px] font-mono text-slate-400 font-bold mt-0.5">
-                            {log.date?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                          </p>
-                        </div>
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black block">แหล่งที่มา (COO COUNTRY)</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.coo || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, coo: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800 font-semibold"
+                        placeholder="COO เช่น US, TH, SG"
+                      />
+                    </div>
 
-                        {/* Routing Path (col-span-5) */}
-                        <div className="md:col-span-5 flex items-center gap-1.5 min-w-0 bg-slate-50 px-2 py-1 border border-slate-200 rounded-sm">
-                          <span className="truncate text-slate-800 font-black text-[9px] max-w-[44%] leading-none" title={log.origin}>
-                            {log.origin}
-                          </span>
-                          <div className="flex items-center gap-0.5 opacity-40 shrink-0">
-                            <span className="w-1 h-1 bg-slate-900 rounded-full" />
-                            <ArrowRight className="w-3 h-3 text-slate-900" />
-                          </div>
-                          <span className="truncate text-blue-600 font-black text-[9px] max-w-[44%] leading-none" title={log.destination}>
-                            {log.destination}
-                          </span>
-                        </div>
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black block">พิกัด HS CODE</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.hsCode || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, hsCode: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800 font-semibold"
+                        placeholder="เช่น 8431.43.00"
+                      />
+                    </div>
 
-                        {/* Invoice & Imports details (col-span-3) */}
-                        <div className="md:col-span-3 flex md:flex-row justify-between items-center md:items-center gap-1.5 text-right mt-1.5 md:mt-0">
-                          <div className="text-left md:text-right">
-                            <p className="text-[7px] uppercase text-slate-400 font-black leading-none">Invoice</p>
-                            <p className="text-[9px] font-mono font-bold text-slate-700 leading-normal">#{log.invoiceNo}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[7px] uppercase text-slate-400 font-black leading-none">Import Entry</p>
-                            <p className="text-[9px] font-bold text-blue-600 italic leading-normal">
-                              {log.importEntryNo || 'N/A'} {log.importEntryLineNo ? `(L:${log.importEntryLineNo})` : ''}
-                            </p>
-                          </div>
-                        </div>
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black block">รหัส ECCN สหรัฐ</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.eccn || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, eccn: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800 font-semibold"
+                        placeholder="เช่น EAR99"
+                      />
+                    </div>
 
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black block">จำนวนพัสดุ (QTY)</label>
+                      <input 
+                        type="number" 
+                        value={tempItem.qty !== undefined ? tempItem.qty : 1} 
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          const up = tempItem.unitPrice || 0;
+                          setTempItem({ ...tempItem, qty: val, amount: val * up });
+                        }}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                      />
+                    </div>
+
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black block">หน่วยนับ (UOM)</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.uom || 'EA'} 
+                        onChange={(e) => setTempItem({ ...tempItem, uom: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800 font-semibold"
+                      />
+                    </div>
+
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black block">ราคาต่อหน่วย (UNIT PRICE)</label>
+                      <input 
+                        type="number" 
+                        value={tempItem.unitPrice !== undefined ? tempItem.unitPrice : 0} 
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          const q = tempItem.qty || 1;
+                          setTempItem({ ...tempItem, unitPrice: val, amount: q * val });
+                        }}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                      />
+                    </div>
+
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black block">ยอดรวมทั้งสิ้น (AMOUNT)</label>
+                      <input 
+                        type="number" 
+                        value={tempItem.amount !== undefined ? tempItem.amount : 0} 
+                        onChange={(e) => setTempItem({ ...tempItem, amount: Number(e.target.value) })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                      />
+                    </div>
+
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-black block">น้ำหนักสุทธิ (WEIGHT KG)</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.itemWeight || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, itemWeight: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                        placeholder="น้ำหนัก (KG)"
+                      />
+                    </div>
+
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-black block">ขนาดพัสดุ (DIMENSIONS L/W/H)</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.dimension || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, dimension: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                        placeholder="ขนาดภายนอก"
+                      />
+                    </div>
+
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-black block">ประเภทกล่อง (PACKAGE TYPE)</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.package || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, package: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                        placeholder="เช่น Box, Wooden Case"
+                      />
+                    </div>
+
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-slate-400 font-black block">เรือ / พาหนะ (VESSEL NAME)</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.vessel || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, vessel: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                        placeholder="ชื่อพาหนะขนส่ง"
+                      />
+                    </div>
+
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-blue-600 font-bold block">หมายเลขสำแดง (CUSTOMS ENTRY)</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.customEntry || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, customEntry: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                        placeholder="เลขใบขนสินค้า เช่น A00..."
+                      />
+                    </div>
+
+                    <div className="bg-white border-2 border-slate-900 p-3.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-1">
+                      <label className="text-[8.5px] text-blue-600 font-bold block">สิทธิ์ศุลกากร (CUSTOMS STATUS)</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.customsStatus || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, customsStatus: e.target.value })}
+                        className="w-full px-2 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                        placeholder="Local, FZ, Drawback"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Route planning and notes layout */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div className="bg-white border-2 border-slate-900 p-4 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] md:col-span-4 space-y-2">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black uppercase">รหัสสาขาวิชา / เซ็กเมนต์ (SEGMENT / IBASE)</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input 
+                          type="text" 
+                          value={tempItem.segment || ''} 
+                          title="SEGMENT"
+                          onChange={(e) => setTempItem({ ...tempItem, segment: e.target.value })}
+                          className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-semibold uppercase text-slate-800"
+                          placeholder="SEGMENT"
+                        />
+                        <input 
+                          type="text" 
+                          value={tempItem.ibase || ''} 
+                          title="IBASE CODE"
+                          onChange={(e) => setTempItem({ ...tempItem, ibase: e.target.value })}
+                          className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-mono font-semibold uppercase text-slate-800"
+                          placeholder="IBASE"
+                        />
                       </div>
                     </div>
-                  ))
+
+                    <div className="bg-white border-2 border-slate-900 p-4 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] md:col-span-4 space-y-2">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black uppercase flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-emerald-600" />
+                        <span>พิกัดจัดเก็บปัจจุบัน (CURRENT LOCATION / PATHS)</span>
+                      </label>
+                      <input 
+                        type="text" 
+                        value={tempItem.currentLocation || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, currentLocation: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-slate-50 border-2 border-slate-950 font-sans text-xs font-black uppercase focus:outline-none focus:border-emerald-600 rounded-none text-emerald-850"
+                        placeholder="In-Base หรือพิกัดจัดเก็บปลายทาง"
+                      />
+                    </div>
+
+                    <div className="bg-white border-2 border-slate-900 p-4 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] md:col-span-4 space-y-2">
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black uppercase">หมายเหตุเพิ่มเติมแอดมิน (ADMIN REMARKS)</label>
+                      <input 
+                        type="text" 
+                        value={tempItem.remark || ''} 
+                        onChange={(e) => setTempItem({ ...tempItem, remark: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-slate-50 border-2 border-slate-950 font-sans text-xs font-semibold focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                        placeholder="เช่น แนบใบอนุญาตนำเข้าพิเศษ"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Actions workspace banner for direct copy or excel exporting */}
+                  <div className="bg-amber-50 border-2 border-amber-950 p-4 flex flex-col md:flex-row items-center justify-between gap-4 select-none">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-5 h-5 text-amber-850 shrink-0" />
+                      <p className="text-[10.5px] text-amber-950 font-bold uppercase tracking-wide leading-snug">
+                        คัดลอกข้อมูลเฉพาะของสินค้าชิ้นนี้นำไปวางใน Excel ได้ทันที!
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const tsv = generateItemsTSV([tempItem]);
+                          navigator.clipboard.writeText(tsv)
+                            .then(() => {
+                              setCopyNotification(`คัดลอกข้อมูลของสินค้าชิ้นนี้ (${tempItem.serialNo}) สำเร็จ! สามารถนำไปวางใน Excel ได้ทันที`);
+                              setTimeout(() => setCopyNotification(null), 5000);
+                            })
+                            .catch(err => {
+                              console.error('Failed to copy single item TSV:', err);
+                              alert('คัดลอกไม่สำเร็จ กรุณาลองอีกครั้ง');
+                            });
+                        }}
+                        className="px-4 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-[9.5px] uppercase tracking-widest cursor-pointer border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+                      >
+                        <span>คัดลอกไปวาง Excel (Copy)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => exportItemsToExcel([tempItem], `item_customs_${tempItem.serialNo}.xlsx`)}
+                        className="px-4 py-2.5 bg-emerald-605 hover:bg-emerald-705 text-white font-black text-[9.5px] uppercase tracking-widest cursor-pointer border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+                      >
+                        <span>ดาวน์โหลด Excel</span>
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+              ) : (
+                /* History Logs viewport section */
+                <table className="w-full text-left border-collapse bg-white border-2 border-slate-900 rounded-none overflow-hidden select-none">
+                  <thead>
+                    <tr className="bg-slate-900 text-white border-b-2 border-slate-900 font-mono font-black text-[9px] uppercase tracking-widest">
+                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5">Date</th>
+                      <th className="px-5 py-3.5">Route Description</th>
+                      <th className="px-5 py-3.5">Invoice Ref</th>
+                      <th className="px-5 py-3.5 text-right">Customs Entry</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y-2 divide-slate-100">
+                    {logs.filter(log => log.serialNo?.trim() === selectedItem.serialNo?.trim()).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-12 text-center text-xs opacity-30 uppercase font-black tracking-widest">
+                          ไม่มีประวัติเดินทางสำแดงไว้ในระบบ
+                        </td>
+                      </tr>
+                    ) : (
+                      logs
+                        .filter(log => log.serialNo?.trim() === selectedItem.serialNo?.trim())
+                        .sort((a, b) => {
+                          const timeA = a.date?.toDate ? a.date.toDate().getTime() : 0;
+                          const timeB = b.date?.toDate ? b.date.toDate().getTime() : 0;
+                          return timeB - timeA;
+                        })
+                        .map((log, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50 transition-colors text-[11px] font-semibold text-slate-800">
+                            <td className="px-5 py-4">
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 border-2 text-[8px] font-black uppercase ${
+                                log.transactionType === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-600'
+                              }`}>
+                                {log.transactionType === 'IN' ? 'IN' : 'OUT'}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 font-mono text-[10.5px]">
+                              {log.date?.toDate ? log.date.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                            </td>
+                            <td className="px-5 py-4 font-sans">
+                              <span className="font-extrabold">{log.origin}</span>
+                              <span className="mx-2 text-slate-400">➔</span>
+                              <span className="font-extrabold text-blue-600">{log.destination}</span>
+                            </td>
+                            <td className="px-5 py-4 font-mono text-slate-500">
+                              #{log.invoiceNo || 'N/A'}
+                            </td>
+                            <td className="px-5 py-4 text-right font-mono font-bold text-blue-600">
+                              {log.importEntryNo || 'N/A'} {log.importEntryLineNo ? `[Line ${log.importEntryLineNo}]` : ''}
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
               )}
             </div>
 
-            {/* Modal Footer Controls */}
-            <div className="mt-6 pt-4 border-t-2 border-slate-100 flex justify-end">
-              <button 
-                onClick={() => {
-                  setSelectedItem(null);
-                  setIsLocationExpanded(false);
-                }}
-                className="px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white border-2 border-slate-900 text-[10px] font-black uppercase tracking-widest transition-colors neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] cursor-pointer"
-              >
-                ปิดหน้าต่าง
-              </button>
+            {/* Modal Controls Bar */}
+            <div className="p-4 bg-white border-t-4 border-slate-900 flex justify-between items-center px-6 shrink-0 flex-wrap gap-4 select-none">
+              <div className="flex items-center gap-3">
+                {saveSuccess ? (
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 border-2 border-emerald-350 flex items-center gap-1">
+                    <Check className="w-4 h-4 text-emerald-600" /> บันทึกการแก้ไขพารามิเตอร์สำเร็จเรียบร้อย!
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2">
+                {modalTab === 'profile' && (
+                  <button
+                    type="button"
+                    onClick={handleSaveItem}
+                    disabled={isSaving}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white border-2 border-slate-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{isSaving ? 'กำลังบันทึกข้อมูล...' : 'บันทึกแก้ไข (Save Changes)'}</span>
+                  </button>
+                )}
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setSelectedItem(null);
+                    setTempItem(null);
+                    setIsLocationExpanded(false);
+                  }}
+                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white border-2 border-slate-900 text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+                >
+                  ปิดหน้าต่างแผงควบคุม
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>
@@ -1034,11 +1596,326 @@ export function Dashboard() {
 }
 
 export function SettingsView() {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<boolean>(false);
+  const [importedCount, setImportedCount] = useState<number | null>(null);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    setError(null);
+    setSuccess(false);
+    setImportedCount(null);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Grab values as header 1 matrix
+        const jsonData = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+
+        if (!jsonData || jsonData.length === 0) {
+          throw new Error('ไม่พบข้อมูลในไฟล์ Excel (Your Excel file appears to be empty)');
+        }
+
+        // Auto-resolve vertically and horizontally merged cells using SheetJS merges metadata
+        if (worksheet['!merges']) {
+          worksheet['!merges'].forEach((merge: any) => {
+            const startRow = merge.s.r;
+            const startCol = merge.s.c;
+            const endRow = merge.e.r;
+            const endCol = merge.e.c;
+            
+            const mainValue = jsonData[startRow]?.[startCol];
+            if (mainValue !== undefined && mainValue !== null && mainValue !== '') {
+              for (let r = startRow; r <= endRow; r++) {
+                if (!jsonData[r]) {
+                  jsonData[r] = [];
+                }
+                for (let c = startCol; c <= endCol; c++) {
+                  while (jsonData[r].length <= c) {
+                    jsonData[r].push(null);
+                  }
+                  // Fill the merged value if it's currently empty/undefined
+                  if (jsonData[r][c] === undefined || jsonData[r][c] === null || jsonData[r][c] === '') {
+                    jsonData[r][c] = mainValue;
+                  }
+                }
+              }
+            }
+          });
+        }
+
+        // Search for header row containing key columns
+        let headerRowIndex = -1;
+        let headerKeys: string[] = [];
+
+        for (let i = 0; i < Math.min(jsonData.length, 50); i++) {
+          const row = jsonData[i];
+          if (!Array.isArray(row)) continue;
+          
+          const hasPartNo = row.some(cell => {
+            const str = String(cell || '').toLowerCase().trim();
+            return str === 'part no.' || str === 'part no' || str === 'partno' || str === 'part_no' || str === 'part_number';
+          });
+          const hasSerialNo = row.some(cell => {
+            const str = String(cell || '').toLowerCase().trim();
+            return str === 'serial no.' || str === 'serial no' || str === 'serialno' || str === 'serial_no' || str === 'serial_number';
+          });
+          const hasDescription = row.some(cell => {
+            const str = String(cell || '').toLowerCase().trim();
+            return str === 'description' || str === 'item' || str === 'desc';
+          });
+
+          if ((hasPartNo && hasSerialNo) || (hasPartNo && hasDescription) || (hasSerialNo && hasDescription)) {
+            headerRowIndex = i;
+            headerKeys = Array.from(row).map(cell => String(cell || '').toLowerCase().trim());
+            break;
+          }
+        }
+
+        // Fallback to first row
+        if (headerRowIndex === -1) {
+          headerRowIndex = 0;
+          headerKeys = Array.from(jsonData[0] || []).map(cell => String(cell || '').toLowerCase().trim());
+        }
+
+        const getColIdx = (keywords: string[]) => {
+          return headerKeys.findIndex(key => 
+            key && typeof key === 'string' && keywords.some(keyword => key.includes(keyword))
+          );
+        };
+
+        const colIdxs = {
+          invoiceNo: getColIdx(['files no', 'file no', 'files', 'file']),
+          lineItem: getColIdx(['line item', 'line', 'item line']),
+          partNo: getColIdx(['part no', 'partno', 'part_no', 'part']),
+          serialNo: getColIdx(['serial no', 'serialno', 'serial_no', 'serial']),
+          description: getColIdx(['description', 'desc']),
+          coo: getColIdx(['coo', 'origin', 'country of origin']),
+          hsCode: getColIdx(['hs code', 'hscode', 'hs_code', 'hs']),
+          eccn: getColIdx(['eccn']),
+          qty: getColIdx(['qty', 'quantity', 'quantity/qty']),
+          uom: getColIdx(['uom', 'unit']),
+          unitPrice: getColIdx(['unit price', 'price', 'unit_price']),
+          amount: getColIdx(['amount']),
+          itemWeight: getColIdx(['weight', 'item weight', 'weight (kg)', 'weight(kg)']),
+          meaningInThai: getColIdx(['meaning in thai', 'meaning index', 'thai', 'meaning']),
+          dimension: getColIdx(['dimension', 'dimention', 'dimensions']),
+          package: getColIdx(['package']),
+          status: getColIdx(['status']),
+          customEntry: getColIdx(['custom entry', 'custom_entry']),
+          destination: getColIdx(['destination', 'dest']),
+          vessel: getColIdx(['vessel']),
+          segment: getColIdx(['segment']),
+          ibase: getColIdx(['ibase']),
+          remark: getColIdx(['remark', 'remarks'])
+        };
+
+        const parsedItems: Partial<InventoryItem>[] = [];
+
+        for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          if (!Array.isArray(row)) continue;
+
+          const partNo = colIdxs.partNo !== -1 ? String(row[colIdxs.partNo] || '').trim() : '';
+          const serialNo = colIdxs.serialNo !== -1 ? String(row[colIdxs.serialNo] || '').trim() : '';
+          const description = colIdxs.description !== -1 ? String(row[colIdxs.description] || '').trim() : '';
+
+          // Skip completely empty rows
+          if (!partNo && !serialNo && !description) {
+            continue;
+          }
+
+          const parseNumber = (val: any): number | undefined => {
+            if (val === undefined || val === null) return undefined;
+            if (typeof val === 'number') return val;
+            const cleaned = String(val).replace(/,/g, '').trim();
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? undefined : parsed;
+          };
+
+          const item: Partial<InventoryItem> = {
+            serialNo: serialNo || 'N/A',
+            partNo: partNo || 'N/A',
+            description: description || 'No Description',
+            status: 'IN',
+            currentLocation: 'In-Base'
+          };
+
+          if (colIdxs.invoiceNo !== -1 && row[colIdxs.invoiceNo] !== undefined) {
+            item.invoiceNo = String(row[colIdxs.invoiceNo] || '').trim();
+          }
+          if (colIdxs.lineItem !== -1 && row[colIdxs.lineItem] !== undefined) {
+            item.lineItem = String(row[colIdxs.lineItem] || '').trim();
+          }
+          if (colIdxs.coo !== -1 && row[colIdxs.coo] !== undefined) {
+            item.coo = String(row[colIdxs.coo] || '').trim();
+          }
+          if (colIdxs.hsCode !== -1 && row[colIdxs.hsCode] !== undefined) {
+            item.hsCode = String(row[colIdxs.hsCode] || '').trim();
+          }
+          if (colIdxs.eccn !== -1 && row[colIdxs.eccn] !== undefined) {
+            item.eccn = String(row[colIdxs.eccn] || '').trim();
+          }
+          if (colIdxs.qty !== -1 && row[colIdxs.qty] !== undefined) {
+            item.qty = parseNumber(row[colIdxs.qty]) ?? 1;
+          }
+          if (colIdxs.uom !== -1 && row[colIdxs.uom] !== undefined) {
+            item.uom = String(row[colIdxs.uom] || '').trim();
+          }
+          if (colIdxs.unitPrice !== -1 && row[colIdxs.unitPrice] !== undefined) {
+            item.unitPrice = parseNumber(row[colIdxs.unitPrice]) ?? 0;
+          }
+          if (colIdxs.amount !== -1 && row[colIdxs.amount] !== undefined) {
+            item.amount = parseNumber(row[colIdxs.amount]) ?? 0;
+          }
+          if (colIdxs.itemWeight !== -1 && row[colIdxs.itemWeight] !== undefined) {
+            const wNum = parseNumber(row[colIdxs.itemWeight]);
+            item.itemWeight = wNum !== undefined ? wNum : String(row[colIdxs.itemWeight]).trim();
+          }
+          if (colIdxs.meaningInThai !== -1 && row[colIdxs.meaningInThai] !== undefined) {
+            item.meaningInThai = String(row[colIdxs.meaningInThai] || '').trim();
+          }
+          if (colIdxs.dimension !== -1 && row[colIdxs.dimension] !== undefined) {
+            item.dimension = String(row[colIdxs.dimension] || '').trim();
+          }
+          if (colIdxs.package !== -1 && row[colIdxs.package] !== undefined) {
+            item.package = String(row[colIdxs.package] || '').trim();
+          }
+          if (colIdxs.customEntry !== -1 && row[colIdxs.customEntry] !== undefined) {
+            item.customEntry = String(row[colIdxs.customEntry] || '').trim();
+          }
+          if (colIdxs.status !== -1 && row[colIdxs.status] !== undefined) {
+            item.customsStatus = String(row[colIdxs.status] || '').trim();
+          }
+          if (colIdxs.destination !== -1 && row[colIdxs.destination] !== undefined) {
+            item.currentLocation = String(row[colIdxs.destination] || '').trim() || 'In-Base';
+          }
+          if (colIdxs.vessel !== -1 && row[colIdxs.vessel] !== undefined) {
+            item.vessel = String(row[colIdxs.vessel] || '').trim();
+          }
+          if (colIdxs.segment !== -1 && row[colIdxs.segment] !== undefined) {
+            item.segment = String(row[colIdxs.segment] || '').trim();
+          }
+          if (colIdxs.ibase !== -1 && row[colIdxs.ibase] !== undefined) {
+            item.ibase = String(row[colIdxs.ibase] || '').trim();
+          }
+          if (colIdxs.remark !== -1 && row[colIdxs.remark] !== undefined) {
+            item.remark = String(row[colIdxs.remark] || '').trim();
+          }
+
+          parsedItems.push(item);
+        }
+
+        if (parsedItems.length === 0) {
+          throw new Error('ไม่สามารถวิเคราะห์ข้อมูลสินค้าได้ หรือไม่มีแถวสินค้าที่ถูกต้องในไฟล์ Excel นี้ (Could not parse any valid product rows with part, serial, or description)');
+        }
+
+        console.log('Parsed Master Inventory items count:', parsedItems.length);
+        
+        // Save items bulk wise
+        await importMasterInventory(parsedItems);
+
+        setImportedCount(parsedItems.length);
+        setSuccess(true);
+      } catch (err: any) {
+        console.error('Error importing master file:', err);
+        setError(err.message || String(err));
+      } finally {
+        setIsProcessing(false);
+        event.target.value = '';
+      }
+    };
+
+    reader.onerror = () => {
+      setError('เกิดข้อผิดพลาดในการอ่านไฟล์ (Failed to read file)');
+      setIsProcessing(false);
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
   return (
     <div className="space-y-12">
       <div className="border-b-4 border-slate-900 pb-8">
         <h2 className="text-4xl font-black uppercase tracking-tighter italic">System Configuration</h2>
         <p className="text-xs font-bold uppercase tracking-widest opacity-40 mt-2">Administrative Control & Global State Management</p>
+      </div>
+
+      {/* MASTER INVENTORY UPLOADER CONTAINER */}
+      <div className="p-8 border-4 border-slate-900 bg-white space-y-6 neo-brutalism-shadow">
+        <div className="border-b-2 border-slate-200 pb-4">
+          <div className="flex items-center gap-3 text-emerald-600">
+            <Upload className="w-6 h-6" />
+            <h3 className="text-xl font-black uppercase tracking-tight">นำเข้า Master Inventory (Import Master File)</h3>
+          </div>
+          <p className="text-[10px] uppercase font-bold text-slate-400 mt-1">
+            เพิ่มฐานข้อมูลสินค้าหลักโดยตรงจากไฟล์ Excel เพื่อใช้เป็นข้อมูลตั้งต้นสำหรับการจับคู่ CIPL
+          </p>
+        </div>
+
+        <div className="relative border-4 border-dashed border-slate-900 bg-slate-50 p-8 flex flex-col items-center justify-center text-center group hover:bg-slate-100 transition-colors">
+          <input 
+            type="file" 
+            accept=".xlsx, .xls"
+            onChange={handleFileUpload}
+            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+            disabled={isProcessing}
+          />
+          {isProcessing ? (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <Upload className="w-12 h-12 animate-bounce text-emerald-600" />
+              <span className="font-mono text-[10px] font-black uppercase text-slate-800">
+                กำลังนำเข้าข้อมูล Master Inventory... (PROCESSING MASTER INVENTORY...)
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <Upload className="w-12 h-12 text-slate-400 group-hover:text-amber-500 group-hover:scale-110 transition-all duration-300" />
+              <div className="space-y-2">
+                <span className="font-mono text-xs font-black uppercase text-slate-800 block">
+                  คลิกที่นี่ หรือ ลากไฟล์ Excel มาวาง เพื่อดำเนินการอัปโหลด
+                </span>
+                <span className="text-[9px] uppercase font-bold text-slate-400 block">
+                  รองรับเอกสารนามสกุล .xlsx และ .xls บันทึกข้อมูลคอลัมน์ Part No, Serial No, Description, COO, และอื่นๆ
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* FEEDBACK STATUS ALERTS */}
+        {success && (
+          <div className="flex items-start gap-4 bg-emerald-50 border-4 border-emerald-500 p-6 text-emerald-800 transition-all font-mono">
+            <CheckCircle2 className="w-6 h-6 shrink-0 text-emerald-600" />
+            <div>
+              <h4 className="text-sm font-black uppercase tracking-wider">นำเข้าข้อมูลสินค้าสำเร็จ! (Import Success)</h4>
+              <p className="text-xs uppercase font-bold mt-1 text-emerald-700">
+                เพิ่มรายการสินค้าในไฟล์ Master Inventory ลงในฐานข้อมูลผู้ใช้งานของคุณเรียบร้อยแล้ว ทั้งหมด {importedCount} รายการ
+              </p>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-start gap-4 bg-red-50 border-4 border-red-500 p-6 text-red-800 transition-all font-mono">
+            <AlertCircle className="w-6 h-6 shrink-0 text-red-600" />
+            <div>
+              <h4 className="text-sm font-black uppercase tracking-wider">เกิดข้อผิดพลาดในการนำเข้าข้อมูล (Import Failed)</h4>
+              <p className="text-xs uppercase font-bold mt-1 text-red-600">
+                {error}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">

@@ -24,6 +24,24 @@ interface ExtractedData {
     description: string;
     importEntryNo: string;
     importEntryLineNo: string;
+
+    // Optional admin fields
+    coo?: string;
+    hsCode?: string;
+    eccn?: string;
+    qty?: number;
+    uom?: string;
+    unitPrice?: number;
+    amount?: number;
+    itemWeight?: string | number;
+    meaningInThai?: string;
+    dimension?: string;
+    package?: string;
+    customEntry?: string;
+    vessel?: string;
+    segment?: string;
+    ibase?: string;
+    remark?: string;
   }>;
 }
 
@@ -57,6 +75,8 @@ export default function FileProcessor() {
         let date = '';
         let shipFrom = '';
         let consignee = '';
+        let segment = '';
+        let vessel = '';
         const items: any[] = [];
 
         // Scan the first 30 rows for header information
@@ -112,6 +132,12 @@ export default function FileProcessor() {
 
             const extractedTo = extractValue('consignee');
             if (extractedTo) consignee = extractedTo;
+
+            const extractedSegment = extractValue('segment');
+            if (extractedSegment) segment = extractedSegment;
+
+            const extractedVessel = extractValue('vessel');
+            if (extractedVessel) vessel = extractedVessel;
           });
         });
 
@@ -127,7 +153,7 @@ export default function FileProcessor() {
 
         if (tableHeaderIdx !== -1) {
           const headerRow = (jsonData[tableHeaderIdx] as any[]).map(h => String(h || '').toLowerCase());
-          const getIdx = (name: string) => headerRow.findIndex(h => h && h.toLowerCase().replace(/\s+/g, '').includes(name.replace(/\s+/g, '')));
+          const getIdx = (name: string) => headerRow.findIndex(h => h && h.toLowerCase().replace(/[^a-z0-9]/g, '').includes(name.toLowerCase().replace(/[^a-z0-9]/g, '')));
           
           const sIdx = getIdx('serialno');
           const pIdx = getIdx('partno');
@@ -136,9 +162,35 @@ export default function FileProcessor() {
           const ienIdx = getIdx('importentryno');
           const ielIdx = getIdx('importentryline');
 
+          // Retrieve optional administrative properties
+          const cooIdx = getIdx('coo') !== -1 ? getIdx('coo') : getIdx('countryoforigin');
+          const hsIdx = getIdx('hscode') !== -1 ? getIdx('hscode') : getIdx('hs');
+          const eccnIdx = getIdx('eccn');
+          const qtyIdx = getIdx('qty') !== -1 ? getIdx('qty') : getIdx('quantity');
+          const uomIdx = getIdx('uom') !== -1 ? getIdx('uom') : getIdx('unitofmeasure');
+          const unitPriceIdx = getIdx('unitprice') !== -1 ? getIdx('unitprice') : getIdx('unit');
+          const amountIdx = getIdx('amount');
+          const weightIdx = getIdx('itemweight') !== -1 ? getIdx('itemweight') : (getIdx('weight') !== -1 ? getIdx('weight') : getIdx('itemweightkg'));
+          const thaiIdx = getIdx('meaninginthai') !== -1 ? getIdx('meaninginthai') : (getIdx('thai') !== -1 ? getIdx('thai') : getIdx('meaning'));
+          const dimIdx = getIdx('dimension') !== -1 ? getIdx('dimension') : getIdx('dimention');
+          const pkgIdx = getIdx('package');
+          const customIdx = getIdx('customentry') !== -1 ? getIdx('customentry') : getIdx('custom');
+          const vesselIdx = getIdx('vessel');
+          const segmentIdx = getIdx('segment');
+          const ibaseIdx = getIdx('ibase');
+          const remarkIdx = getIdx('remark');
+
           for (let i = tableHeaderIdx + 1; i < jsonData.length; i++) {
             const row = jsonData[i] as any[];
-            if (row && sIdx !== -1 && row[sIdx]) {
+            if (!row) continue;
+
+            // Stop parsing if we hit the total row or packing details section
+            const rowString = row.map(cell => cell ? String(cell).toLowerCase().trim() : '').join(' ');
+            if (rowString.includes('total') || rowString.includes('packing details') || rowString.includes('special instructions')) {
+              break;
+            }
+
+            if (sIdx !== -1 && row[sIdx]) {
               items.push({
                 lineItem: String(row[lIdx] || i - tableHeaderIdx),
                 partNo: String(row[pIdx] || 'N/A'),
@@ -146,9 +198,214 @@ export default function FileProcessor() {
                 description: String(row[dIdx] || 'No Description'),
                 importEntryNo: String(row[ienIdx] || ''),
                 importEntryLineNo: String(row[ielIdx] || ''),
+
+                coo: cooIdx !== -1 ? String(row[cooIdx] || '') : '',
+                hsCode: hsIdx !== -1 ? String(row[hsIdx] || '') : '',
+                eccn: eccnIdx !== -1 ? String(row[eccnIdx] || '') : '',
+                qty: qtyIdx !== -1 && row[qtyIdx] !== undefined ? Number(row[qtyIdx]) : 1,
+                uom: uomIdx !== -1 ? String(row[uomIdx] || 'EA') : 'EA',
+                unitPrice: unitPriceIdx !== -1 && row[unitPriceIdx] !== undefined ? Number(row[unitPriceIdx]) : 0,
+                amount: amountIdx !== -1 && row[amountIdx] !== undefined ? Number(row[amountIdx]) : 0,
+                itemWeight: weightIdx !== -1 ? String(row[weightIdx] || '') : '',
+                meaningInThai: thaiIdx !== -1 ? String(row[thaiIdx] || '') : '',
+                dimension: dimIdx !== -1 ? String(row[dimIdx] || '') : '',
+                package: pkgIdx !== -1 ? String(row[pkgIdx] || '') : '',
+                customEntry: customIdx !== -1 ? String(row[customIdx] || '') : '',
+                vessel: (vesselIdx !== -1 && String(row[vesselIdx] || '').trim()) ? String(row[vesselIdx]).trim() : vessel,
+                segment: (segmentIdx !== -1 && String(row[segmentIdx] || '').trim()) ? String(row[segmentIdx]).trim() : segment,
+                ibase: ibaseIdx !== -1 ? String(row[ibaseIdx] || '') : '',
+                remark: remarkIdx !== -1 ? String(row[remarkIdx] || '') : '',
               });
             }
           }
+        }
+
+        // Parse PACKING DETAILS table at the bottom of the invoice if present
+        let packingHeaderIdx = -1;
+        for (let i = 0; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          if (Array.isArray(row) && row.some((cell: any) => cell && String(cell).toLowerCase().includes('package type'))) {
+            packingHeaderIdx = i;
+            break;
+          }
+        }
+
+        const parseWeightNum = (val: string | number | undefined): number => {
+          if (val === undefined || val === null) return 0;
+          if (typeof val === 'number') return val;
+          const cleaned = String(val).replace(/,/g, '').trim();
+          const match = cleaned.match(/[\d.]+/);
+          if (match) {
+            const parsed = parseFloat(match[0]);
+            return isNaN(parsed) ? 0 : parsed;
+          }
+          return 0;
+        };
+
+        const parseItemLinesFromRemark = (remark: string): number[] => {
+          if (!remark) return [];
+          const lineNumbers: number[] = [];
+          
+          // Clean the remark by replacing non-numeric/non-separator chars with spaces
+          const cleaned = remark.toLowerCase().replace(/[^0-9\s,-]/g, ' ');
+          
+          // Split by commas
+          const parts = cleaned.split(',');
+          parts.forEach(part => {
+            const trimmed = part.trim();
+            if (!trimmed) return;
+
+            // Handle range match like "2-7" or "2 to 7"
+            const rangeMatch = trimmed.match(/(\d+)\s*[-to]+\s*(\d+)/);
+            if (rangeMatch) {
+              const start = parseInt(rangeMatch[1], 10);
+              const end = parseInt(rangeMatch[2], 10);
+              if (!isNaN(start) && !isNaN(end)) {
+                for (let i = start; i <= end; i++) {
+                  if (!lineNumbers.includes(i)) lineNumbers.push(i);
+                }
+              }
+            } else {
+              // Handle list of single items
+              const singleMatches = trimmed.match(/\d+/g);
+              if (singleMatches) {
+                singleMatches.forEach(numStr => {
+                  const num = parseInt(numStr, 10);
+                  if (!isNaN(num) && !lineNumbers.includes(num)) {
+                    lineNumbers.push(num);
+                  }
+                });
+              }
+            }
+          });
+          
+          return lineNumbers;
+        };
+
+        if (packingHeaderIdx !== -1) {
+          const pHeader = (jsonData[packingHeaderIdx] as any[]).map(h => String(h || '').toLowerCase());
+          const getPIdx = (name: string) => pHeader.findIndex(h => h && h.toLowerCase().replace(/[^a-z0-9]/g, '').includes(name.toLowerCase().replace(/[^a-z0-9]/g, '')));
+          
+          const pkgTypeIdx = getPIdx('packagetype') !== -1 ? getPIdx('packagetype') : getPIdx('package');
+          const pRemarkIdx = getPIdx('remark');
+          
+          // Identify Net Weight and Gross Weight columns in packing details
+          const netWeightIdx = pHeader.findIndex(h => h && (h.includes('net') || h.includes('n.w')));
+          const grossWeightIdx = pHeader.findIndex(h => h && (h.includes('gross') || h.includes('g.w')));
+          const dimStartIdx = pHeader.findIndex(h => h && h.includes('dimension'));
+          
+          const packages: Array<{
+            pkgTypeVal: string;
+            dimensionVal: string;
+            netW: string;
+            grossW: string;
+            remarkVal: string;
+            matchedLines: number[];
+          }> = [];
+
+          for (let i = packingHeaderIdx + 1; i < jsonData.length; i++) {
+            const row = jsonData[i] as any[];
+            if (!row || row.length === 0) continue;
+            
+            // If we hit standard text at the bottom, stop
+            const rowString = row.map(cell => cell ? String(cell).toLowerCase().trim() : '').join(' ');
+            if (rowString.includes('special instructions') || rowString.includes('authorized signature') || rowString.includes('hereby declare')) {
+              break;
+            }
+            
+            const pkgTypeVal = pkgTypeIdx !== -1 ? String(row[pkgTypeIdx] || '').trim() : '';
+            const remarkVal = pRemarkIdx !== -1 ? String(row[pRemarkIdx] || '').trim() : '';
+            
+            // Reconstruct dimensions (L, W, H listed in successive columns)
+            let dimensionVal = '';
+            if (dimStartIdx !== -1 && dimStartIdx + 2 < row.length) {
+              const l = row[dimStartIdx];
+              const w = row[dimStartIdx + 1];
+              const h = row[dimStartIdx + 2];
+              if (l !== undefined || w !== undefined || h !== undefined) {
+                dimensionVal = `${l || ''} x ${w || ''} x ${h || ''}`.trim().replace(/\s*x\s*$/, '');
+              }
+            } else {
+              const dimCell = row.find(c => c && String(c).includes('x'));
+              if (dimCell) dimensionVal = String(dimCell);
+            }
+            
+            let netW = '';
+            if (netWeightIdx !== -1) {
+              netW = String(row[netWeightIdx] || '').trim();
+            }
+            
+            let grossW = '';
+            if (grossWeightIdx !== -1) {
+              grossW = String(row[grossWeightIdx] || '').trim();
+            } else {
+              const weightCellIdx = pHeader.findIndex(h => h && h.includes('weight'));
+              if (weightCellIdx !== -1) {
+                grossW = String(row[weightCellIdx] || '').trim();
+              }
+            }
+            
+            if (pkgTypeVal || remarkVal) {
+              packages.push({
+                pkgTypeVal,
+                dimensionVal,
+                netW,
+                grossW,
+                remarkVal,
+                matchedLines: parseItemLinesFromRemark(remarkVal),
+              });
+            }
+          }
+
+          // Match each item to the best scoring package
+          items.forEach(item => {
+            let bestPkg: typeof packages[0] | null = null;
+            let highestScore = -1;
+
+            packages.forEach(pkg => {
+              let score = 0;
+
+              // 1. Direct serial number match (highest priority)
+              if (item.serialNo && pkg.pkgTypeVal.toLowerCase().includes(item.serialNo.toLowerCase())) {
+                score = 100;
+              }
+
+              // 2. Remark range match
+              const itemLineNum = parseInt(item.lineItem, 10);
+              if (!isNaN(itemLineNum) && pkg.matchedLines.includes(itemLineNum)) {
+                // If package matches the line item, give priority to smaller/more specific list sizes
+                const rangeSize = pkg.matchedLines.length;
+                const remarkScore = Math.max(10, 50 - rangeSize);
+                if (remarkScore > score) {
+                  score = remarkScore;
+                }
+              }
+
+              // 3. Physical weight match bonus
+              const itemWNum = parseWeightNum(item.itemWeight);
+              const pkgNetWNum = parseWeightNum(pkg.netW);
+              const pkgGrossWNum = parseWeightNum(pkg.grossW);
+
+              if (itemWNum > 0) {
+                // Perfect matching for weight (net or gross) as we expect physical items to match package parameters
+                if (Math.abs(itemWNum - pkgNetWNum) < 1.0 || Math.abs(itemWNum - pkgGrossWNum) < 1.0) {
+                  score += 25; // Significant boost to steer overlap correctly
+                }
+              }
+
+              if (score > highestScore && score > 0) {
+                highestScore = score;
+                bestPkg = pkg;
+              }
+            });
+
+            if (bestPkg) {
+              const pkg: typeof packages[0] = bestPkg;
+              if (pkg.pkgTypeVal) item.package = pkg.pkgTypeVal;
+              if (pkg.dimensionVal) item.dimension = pkg.dimensionVal;
+              if (pkg.grossW) item.itemWeight = pkg.grossW;
+            }
+          });
         }
 
         if (items.length === 0) {

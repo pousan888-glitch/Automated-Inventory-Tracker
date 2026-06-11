@@ -61,6 +61,27 @@ export interface InventoryItem {
   lastUpdate: any; // Firestore Timestamp
   importEntryNo?: string;
   importEntryLineNo?: string;
+  
+  // Administrative fields from CIPL and PDF
+  coo?: string;
+  hsCode?: string;
+  eccn?: string;
+  qty?: number;
+  uom?: string;
+  unitPrice?: number;
+  amount?: number;
+  itemWeight?: string | number;
+  meaningInThai?: string;
+  dimension?: string;
+  package?: string;
+  customEntry?: string;
+  vessel?: string;
+  segment?: string;
+  ibase?: string;
+  remark?: string;
+  lineItem?: string;
+  invoiceNo?: string;
+  customsStatus?: string;
 }
 
 export interface TransactionLog {
@@ -74,6 +95,27 @@ export interface TransactionLog {
   lineItem: string;
   importEntryNo: string;
   importEntryLineNo: string;
+
+  // Additional fields for auditing matching items
+  coo?: string;
+  hsCode?: string;
+  eccn?: string;
+  qty?: number;
+  uom?: string;
+  unitPrice?: number;
+  amount?: number;
+  itemWeight?: string | number;
+  meaningInThai?: string;
+  dimension?: string;
+  package?: string;
+  customEntry?: string;
+  vessel?: string;
+  segment?: string;
+  ibase?: string;
+  remark?: string;
+  partNo?: string;
+  description?: string;
+  customsStatus?: string;
 }
 
 export async function processInventoryUpdate(
@@ -85,6 +127,25 @@ export async function processInventoryUpdate(
     description: string;
     importEntryNo: string;
     importEntryLineNo: string;
+
+    // Optional administrative fields
+    coo?: string;
+    hsCode?: string;
+    eccn?: string;
+    qty?: number;
+    uom?: string;
+    unitPrice?: number;
+    amount?: number;
+    itemWeight?: string | number;
+    meaningInThai?: string;
+    dimension?: string;
+    package?: string;
+    customEntry?: string;
+    vessel?: string;
+    segment?: string;
+    ibase?: string;
+    remark?: string;
+    customsStatus?: string;
   }>
 ) {
   const userId = auth.currentUser?.uid;
@@ -116,7 +177,28 @@ export async function processInventoryUpdate(
         currentLocation: currentLocation,
         lastUpdate: serverTimestamp(),
         importEntryNo: item.importEntryNo || '',
-        importEntryLineNo: item.importEntryLineNo || ''
+        importEntryLineNo: item.importEntryLineNo || '',
+        invoiceNo: header.invoiceNo,
+
+        // Bind CIPL metadata
+        coo: item.coo || '',
+        hsCode: item.hsCode || '',
+        eccn: item.eccn || '',
+        qty: item.qty !== undefined ? Number(item.qty) : 1,
+        uom: item.uom || 'EA',
+        unitPrice: item.unitPrice !== undefined ? Number(item.unitPrice) : 0,
+        amount: item.amount !== undefined ? Number(item.amount) : 0,
+        itemWeight: item.itemWeight || '',
+        meaningInThai: item.meaningInThai || '',
+        dimension: item.dimension || '',
+        package: item.package || '',
+        customEntry: item.customEntry || '',
+        vessel: item.vessel || '',
+        segment: item.segment || '',
+        ibase: item.ibase || '',
+        remark: item.remark || '',
+        lineItem: item.lineItem || '',
+        customsStatus: item.customsStatus || ''
       }, { merge: true });
 
       // Add Transaction Log for this user
@@ -130,7 +212,28 @@ export async function processInventoryUpdate(
         destination: header.consignee,
         lineItem: item.lineItem,
         importEntryNo: item.importEntryNo,
-        importEntryLineNo: item.importEntryLineNo
+        importEntryLineNo: item.importEntryLineNo,
+
+        // Bind log level metadata
+        partNo: item.partNo,
+        description: item.description,
+        coo: item.coo || '',
+        hsCode: item.hsCode || '',
+        eccn: item.eccn || '',
+        qty: item.qty !== undefined ? Number(item.qty) : 1,
+        uom: item.uom || 'EA',
+        unitPrice: item.unitPrice !== undefined ? Number(item.unitPrice) : 0,
+        amount: item.amount !== undefined ? Number(item.amount) : 0,
+        itemWeight: item.itemWeight || '',
+        meaningInThai: item.meaningInThai || '',
+        dimension: item.dimension || '',
+        package: item.package || '',
+        customEntry: item.customEntry || '',
+        vessel: item.vessel || '',
+        segment: item.segment || '',
+        ibase: item.ibase || '',
+        remark: item.remark || '',
+        customsStatus: item.customsStatus || ''
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `inventory/${serialNo}`);
@@ -215,3 +318,82 @@ export function subscribeToLogs(callback: (logs: TransactionLog[]) => void) {
     handleFirestoreError(error, OperationType.LIST, 'logs');
   });
 }
+
+export async function updateInventoryItem(item: InventoryItem) {
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    throw new Error('User must be authenticated to update an inventory item.');
+  }
+  const docId = `${userId}_${item.serialNo.replace(/\//g, '_')}`;
+  const inventoryRef = doc(db, 'inventory', docId);
+  await setDoc(inventoryRef, {
+    ...item,
+    userId,
+    lastUpdate: serverTimestamp()
+  }, { merge: true });
+}
+
+export async function importMasterInventory(items: Array<Partial<InventoryItem>>) {
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    throw new Error('User must be authenticated to import master inventory.');
+  }
+
+  for (let i = 0; i < items.length; i += 500) {
+    const batch = writeBatch(db);
+    const chunk = items.slice(i, i + 500);
+
+    chunk.forEach((item) => {
+      let serialNo = (item.serialNo || '').trim();
+      const partNo = (item.partNo || '').trim();
+      const lineItem = (item.lineItem || '').trim();
+
+      // If serial number is empty or "N/A", generate a unique key to prevent grouping overwrites
+      if (!serialNo || serialNo.toUpperCase() === 'N/A') {
+        const uniqueSuffix = lineItem ? `L${lineItem}` : Math.random().toString(36).substring(2, 7).toUpperCase();
+        serialNo = `N/A-${partNo || 'ITEM'}-${uniqueSuffix}`;
+      }
+
+      const docId = `${userId}_${serialNo.replace(/\//g, '_')}`;
+      const inventoryRef = doc(db, 'inventory', docId);
+
+      const cleanItem: any = {
+        userId,
+        serialNo,
+        partNo: partNo || 'N/A',
+        description: (item.description || '').trim() || 'No Description',
+        status: (item.status === 'OUT' ? 'OUT' : 'IN'),
+        currentLocation: (item.currentLocation || 'In-Base').trim(),
+        lastUpdate: serverTimestamp(),
+        importEntryNo: (item.importEntryNo || '').trim(),
+        importEntryLineNo: (item.importEntryLineNo || '').trim(),
+        invoiceNo: (item.invoiceNo || '').trim(),
+        lineItem: lineItem
+      };
+
+      if (item.coo) cleanItem.coo = String(item.coo).trim();
+      if (item.hsCode) cleanItem.hsCode = String(item.hsCode).trim();
+      if (item.eccn) cleanItem.eccn = String(item.eccn).trim();
+      if (item.qty !== undefined) cleanItem.qty = Number(item.qty);
+      if (item.uom) cleanItem.uom = String(item.uom).trim();
+      if (item.unitPrice !== undefined) cleanItem.unitPrice = Number(item.unitPrice);
+      if (item.amount !== undefined) cleanItem.amount = Number(item.amount);
+      if (item.itemWeight !== undefined) cleanItem.itemWeight = item.itemWeight;
+      if (item.meaningInThai) cleanItem.meaningInThai = String(item.meaningInThai).trim();
+      if (item.dimension) cleanItem.dimension = String(item.dimension).trim();
+      if (item.package) cleanItem.package = String(item.package).trim();
+      if (item.customEntry) cleanItem.customEntry = String(item.customEntry).trim();
+      if (item.vessel) cleanItem.vessel = String(item.vessel).trim();
+      if (item.segment) cleanItem.segment = String(item.segment).trim();
+      if (item.ibase) cleanItem.ibase = String(item.ibase).trim();
+      if (item.remark) cleanItem.remark = String(item.remark).trim();
+      if (item.customsStatus) cleanItem.customsStatus = String(item.customsStatus).trim();
+
+      batch.set(inventoryRef, cleanItem, { merge: true });
+    });
+
+    await batch.commit();
+  }
+}
+
+
