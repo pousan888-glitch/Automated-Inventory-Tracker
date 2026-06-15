@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone, type FileRejection, type DropEvent } from 'react-dropzone';
 import * as XLSX from 'xlsx';
-import { Upload, FileCheck, Loader2, AlertCircle, CheckCircle2, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
-import { processInventoryUpdate, subscribeToInventory, InventoryItem } from '../lib/inventoryService';
+import { Upload, FileCheck, Loader2, AlertCircle, CheckCircle2, ArrowDownLeft, ArrowUpRight, FileSpreadsheet } from 'lucide-react';
+import { processInventoryUpdate, subscribeToInventory, InventoryItem, importFzInventoryReport } from '../lib/inventoryService';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 
@@ -92,6 +92,7 @@ export default function FileProcessor() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadType, setUploadType] = useState<'IN' | 'OUT'>('IN');
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
+  const [fzExtractedData, setFzExtractedData] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   
@@ -579,6 +580,119 @@ export default function FileProcessor() {
     reader.readAsArrayBuffer(file);
   }, []);
 
+  const onDropFz = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    setError(null);
+    setSuccess(false);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const jsonData = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+        console.log('FZ Parsed JSON:', jsonData);
+
+        let headerRowIdx = -1;
+        for (let i = 0; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          if (Array.isArray(row) && row.some((cell: any) => cell && (String(cell).toLowerCase().includes('inbound_number') || String(cell).toLowerCase().includes('inbound number')))) {
+            headerRowIdx = i;
+            break;
+          }
+        }
+
+        if (headerRowIdx === -1) {
+          for (let i = 0; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            if (Array.isArray(row)) {
+              const rowStr = row.map(c => String(c || '').toLowerCase()).join(' ');
+              if (rowStr.includes('description') && (rowStr.includes('quantity') || rowStr.includes('qty') || rowStr.includes('itemnumber') || rowStr.includes('item number'))) {
+                headerRowIdx = i;
+                break;
+              }
+            }
+          }
+        }
+
+        if (headerRowIdx === -1) {
+          throw new Error('ไม่พบเทมเพลต SCHLUMBERGER - FZ Inventory Report (ไม่พบคอลัมน์ Inbound_Number หรือ Description)');
+        }
+
+        const headerRow = (jsonData[headerRowIdx] as any[]).map(h => String(h || '').toLowerCase().trim());
+        const getColIdx = (names: string[]) => {
+          return headerRow.findIndex(h => h && names.some(name => h.replace(/[^a-z0-9]/g, '').includes(name.replace(/[^a-z0-9]/g, ''))));
+        };
+
+        const inboundNumberIdx = getColIdx(['inboundnumber', 'inbound_number', 'customsentry', 'customentry', 'entryno']);
+        const itemNumberIdx = getColIdx(['itemnumber', 'item_number', 'lineitem', 'item', 'line']);
+        const inboundDateIdx = getColIdx(['inbounddate', 'inbound_date', 'date']);
+        const descriptionIdx = getColIdx(['description', 'desc']);
+        const unitTypeIdx = getColIdx(['unittype', 'unit_type', 'uom', 'unit']);
+        const quantityIdx = getColIdx(['quantity', 'qty', 'quantities']);
+        const valueIdx = getColIdx(['value', 'val', 'coo', 'country']);
+        const dutyIncomeIdx = getColIdx(['dutyincome', 'duty_income', 'segment']);
+
+        const fzItems: any[] = [];
+        for (let i = headerRowIdx + 1; i < jsonData.length; i++) {
+          const row = jsonData[i] as any[];
+          if (!row || row.length === 0) continue;
+
+          const descVal = descriptionIdx !== -1 ? String(row[descriptionIdx] || '').trim() : '';
+          const inboundNumVal = inboundNumberIdx !== -1 ? String(row[inboundNumberIdx] || '').trim() : '';
+          if (!descVal && !inboundNumVal) continue;
+
+          if (descVal.toLowerCase().includes('total') || inboundNumVal.toLowerCase().includes('total')) {
+            continue;
+          }
+
+          const rawInboundDate = inboundDateIdx !== -1 ? row[inboundDateIdx] : '';
+          let formattedDate = '';
+          if (rawInboundDate) {
+            if (typeof rawInboundDate === 'number') {
+              try {
+                const dateObj = new Date((rawInboundDate - 25569) * 86400 * 1000);
+                formattedDate = dateObj.toLocaleDateString('en-GB'); 
+              } catch (dateErr) {
+                formattedDate = String(rawInboundDate).trim();
+              }
+            } else {
+              formattedDate = String(rawInboundDate).trim();
+            }
+          }
+
+          fzItems.push({
+            inboundNumber: inboundNumVal,
+            itemNumber: itemNumberIdx !== -1 ? String(row[itemNumberIdx] || '').trim() : String(fzItems.length + 1),
+            inboundDate: formattedDate,
+            description: descVal,
+            unitType: unitTypeIdx !== -1 ? String(row[unitTypeIdx] || 'EA').trim() : 'EA',
+            quantity: quantityIdx !== -1 ? Number(row[quantityIdx]) || 1 : 1,
+            value: valueIdx !== -1 ? String(row[valueIdx] || '').trim() : '',
+            dutyIncome: dutyIncomeIdx !== -1 ? String(row[dutyIncomeIdx] || '').trim() : ''
+          });
+        }
+
+        if (fzItems.length === 0) {
+          throw new Error('ไม่พบข้อมูลสินค้ารายการใดในเอกสาร FZ Report นี้');
+        }
+
+        setFzExtractedData(fzItems);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to parse FZ Inventory Report.');
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }, []);
+
   // @ts-ignore
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (files) => onDrop(files),
@@ -589,6 +703,31 @@ export default function FileProcessor() {
     },
     multiple: false
   });
+
+  // @ts-ignore
+  const { getRootProps: getFzRootProps, getInputProps: getFzInputProps, isDragActive: isFzDragActive } = useDropzone({
+    onDrop: (files) => onDropFz(files),
+    accept: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'application/vnd.ms-excel': ['.xls'],
+      'text/csv': ['.csv'],
+    },
+    multiple: false
+  });
+
+  const handleConfirmFz = async () => {
+    if (!fzExtractedData) return;
+    setIsProcessing(true);
+    try {
+      await importFzInventoryReport(fzExtractedData);
+      setSuccess(true);
+      setFzExtractedData(null);
+    } catch (err: any) {
+      setError(`Failed to import FZ Report: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleConfirm = async () => {
     if (!extractedData) return;
@@ -606,87 +745,119 @@ export default function FileProcessor() {
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
-      {/* 🟢 Select Upload Mode Toggle Segmented Control */}
-      <div className="bg-white border-2 border-slate-900 p-5 neo-brutalism-shadow space-y-3">
-        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block font-mono">
-          ขั้นตอนที่ 1: เลือกเมนูสินค้าใน INVOICE (CHOOSE CIPL DIRECTION VALUE)
-        </label>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button
-            type="button"
-            onClick={() => setUploadType('IN')}
+      {!extractedData && !fzExtractedData && (
+        <>
+          {/* 🟢 Select Upload Mode Toggle Segmented Control */}
+          <div className="bg-white border-2 border-slate-900 p-5 neo-brutalism-shadow space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block font-mono">
+              ขั้นตอนที่ 1: เลือกเมนูสินค้าใน INVOICE (CHOOSE CIPL DIRECTION VALUE)
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => setUploadType('IN')}
+                className={cn(
+                  "flex flex-col sm:flex-row items-center justify-start gap-4 p-4 border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 text-left",
+                  uploadType === 'IN'
+                    ? "bg-emerald-50 border-emerald-600 text-emerald-800 ring-2 ring-emerald-600/30"
+                    : "bg-white border-slate-300 hover:border-slate-800 text-slate-600"
+                )}
+              >
+                <div className={cn(
+                  "p-2 border shrink-0 flex items-center justify-center rounded-none",
+                  uploadType === 'IN' ? "border-emerald-600 bg-emerald-100 text-emerald-700" : "border-slate-300 bg-slate-50 text-slate-400"
+                )}>
+                  <ArrowDownLeft className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="block text-[11px] font-black tracking-wide">ของเข้าคลัง (INCOMING / IMPORT)</span>
+                  <span className="text-[9px] font-medium text-slate-400 block tracking-normal normal-case mt-0.5 font-mono">
+                    สแกนเข้าระบบจัดเก็บคลังหลัก / สถานะสินค้าเปลี่ยนเป็น IN
+                  </span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setUploadType('OUT')}
+                className={cn(
+                  "flex flex-col sm:flex-row items-center justify-start gap-4 p-4 border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 text-left",
+                  uploadType === 'OUT'
+                    ? "bg-red-50 border-red-600 text-red-800 ring-2 ring-red-600/30"
+                    : "bg-white border-slate-300 hover:border-slate-800 text-slate-600"
+                )}
+              >
+                <div className={cn(
+                  "p-2 border shrink-0 flex items-center justify-center rounded-none",
+                  uploadType === 'OUT' ? "border-red-600 bg-red-100 text-red-700" : "border-slate-300 bg-slate-50 text-slate-400"
+                )}>
+                  <ArrowUpRight className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="block text-[11px] font-black tracking-wide">ของออก / ส่งไปต่างประเทศ (OUTGOING / EXPORT)</span>
+                  <span className="text-[9px] font-medium text-slate-400 block tracking-normal normal-case mt-0.5 font-mono">
+                    สินค้าเตรียมส่งออกต่างประเทศ / สถานะสินค้าเป็น OUT
+                  </span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div 
+            {...getRootProps()} 
             className={cn(
-              "flex flex-col sm:flex-row items-center justify-start gap-4 p-4 border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 text-left",
-              uploadType === 'IN'
-                ? "bg-emerald-50 border-emerald-600 text-emerald-800 ring-2 ring-emerald-600/30"
-                : "bg-white border-slate-300 hover:border-slate-800 text-slate-600"
+              "border-4 border-dashed p-16 flex flex-col items-center justify-center transition-all bg-white cursor-pointer",
+              isDragActive ? "border-blue-600 bg-blue-50" : "border-slate-300 hover:border-slate-900",
+              uploadType === 'IN' ? "hover:bg-emerald-50/20" : "hover:bg-red-50/20"
             )}
           >
-            <div className={cn(
-              "p-2 border shrink-0 flex items-center justify-center rounded-none",
-              uploadType === 'IN' ? "border-emerald-600 bg-emerald-100 text-emerald-700" : "border-slate-300 bg-slate-50 text-slate-400"
+            <input {...getInputProps()} />
+            <div className="w-16 h-16 border-2 border-slate-900 flex items-center justify-center mb-6 bg-slate-100">
+              <Upload className="w-8 h-8 text-slate-900" />
+            </div>
+            <h3 className="text-xs font-black uppercase tracking-widest mb-2 font-sans text-center">
+              Upload Shipping Invoice ({uploadType === 'IN' ? 'ของเข้า / INCOMING' : 'ของออก / OUTGOING'})
+            </h3>
+            <p className="text-[10px] opacity-40 uppercase tracking-widest text-center max-w-xs font-mono">
+              Supports XLSX, CSV, XLS
+            </p>
+            <button className={cn(
+              "mt-8 px-12 py-3 text-white font-bold text-[10px] uppercase tracking-widest active-neo-brutalism neo-brutalism-shadow",
+              uploadType === 'IN' ? "bg-emerald-600" : "bg-red-600"
             )}>
-              <ArrowDownLeft className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="block text-[11px] font-black tracking-wide">ของเข้าคลัง (INCOMING / IMPORT)</span>
-              <span className="text-[9px] font-medium text-slate-400 block tracking-normal normal-case mt-0.5 font-mono">
-                สแกนเข้าระบบจัดเก็บคลังหลัก / สถานะสินค้าเปลี่ยนเป็น IN
-              </span>
-            </div>
-          </button>
+              Browse Files
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setUploadType('OUT')}
-            className={cn(
-              "flex flex-col sm:flex-row items-center justify-start gap-4 p-4 border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 text-left",
-              uploadType === 'OUT'
-                ? "bg-red-50 border-red-600 text-red-800 ring-2 ring-red-600/30"
-                : "bg-white border-slate-300 hover:border-slate-800 text-slate-600"
-            )}
-          >
-            <div className={cn(
-              "p-2 border shrink-0 flex items-center justify-center rounded-none",
-              uploadType === 'OUT' ? "border-red-600 bg-red-100 text-red-700" : "border-slate-300 bg-slate-50 text-slate-400"
-            )}>
-              <ArrowUpRight className="w-5 h-5" />
+          {/* 📦 SCHLUMBERGER - FZ Inventory Report Upload Section */}
+          <div className="bg-white border-2 border-slate-900 p-5 neo-brutalism-shadow space-y-4">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block font-mono">
+              ข้อมูลประมวลผลรายงานสินค้า Free Zone (SCHLUMBERGER - FZ INVENTORY REPORT)
+            </label>
+            <div 
+              {...getFzRootProps()} 
+              className={cn(
+                "border-4 border-dashed p-12 flex flex-col items-center justify-center transition-all bg-slate-50 cursor-pointer",
+                isFzDragActive ? "border-amber-600 bg-amber-50" : "border-slate-300 hover:border-slate-900"
+              )}
+            >
+              <input {...getFzInputProps()} />
+              <div className="w-12 h-12 border-2 border-slate-900 flex items-center justify-center mb-4 bg-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
+                <FileSpreadsheet className="w-6 h-6 text-slate-900" />
+              </div>
+              <h4 className="text-[11px] font-black uppercase tracking-widest mb-1 font-sans text-center">
+                SCHLUMBERGER - FZ Inventory Report
+              </h4>
+              <p className="text-[9px] opacity-50 uppercase tracking-widest text-center max-w-xs font-mono">
+                สแกนรายงานอัปเดตคลังรายสัปดาห์จากผู้บริหารฟรีโซน (XLSX, CSV, XLS)
+              </p>
+              <button className="mt-4 px-8 py-2 bg-slate-950 text-white font-bold text-[9px] uppercase tracking-widest active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                Browse FZ Inventory Report
+              </button>
             </div>
-            <div>
-              <span className="block text-[11px] font-black tracking-wide">ของออก / ส่งไปต่างประเทศ (OUTGOING / EXPORT)</span>
-              <span className="text-[9px] font-medium text-slate-400 block tracking-normal normal-case mt-0.5 font-mono">
-                สินค้าเตรียมส่งออกต่างประเทศ / สถานะสินค้าเป็น OUT
-              </span>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      <div 
-        {...getRootProps()} 
-        className={cn(
-          "border-4 border-dashed p-16 flex flex-col items-center justify-center transition-all bg-white cursor-pointer",
-          isDragActive ? "border-blue-600 bg-blue-50" : "border-slate-300 hover:border-slate-900",
-          uploadType === 'IN' ? "hover:bg-emerald-50/20" : "hover:bg-red-50/20"
-        )}
-      >
-        <input {...getInputProps()} />
-        <div className="w-16 h-16 border-2 border-slate-900 flex items-center justify-center mb-6 bg-slate-100">
-          <Upload className="w-8 h-8 text-slate-900" />
-        </div>
-        <h3 className="text-xs font-black uppercase tracking-widest mb-2 font-sans text-center">
-          Upload Shipping Invoice ({uploadType === 'IN' ? 'ของเข้า / INCOMING' : 'ของออก / OUTGOING'})
-        </h3>
-        <p className="text-[10px] opacity-40 uppercase tracking-widest text-center max-w-xs font-mono">
-          Supports XLSX, CSV, XLS
-        </p>
-        <button className={cn(
-          "mt-8 px-12 py-3 text-white font-bold text-[10px] uppercase tracking-widest active-neo-brutalism neo-brutalism-shadow",
-          uploadType === 'IN' ? "bg-emerald-600" : "bg-red-600"
-        )}>
-          Browse Files
-        </button>
-      </div>
+          </div>
+        </>
+      )}
 
       <AnimatePresence>
         {isProcessing && (
@@ -729,6 +900,84 @@ export default function FileProcessor() {
             >
               System Reset
             </button>
+          </motion.div>
+        )}
+
+        {fzExtractedData && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-white border-2 border-slate-900 flex flex-col"
+          >
+            <div className="bg-amber-600 p-4 flex justify-between items-center border-b-2 border-slate-900">
+              <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-3">
+                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                รายงานสินค้า Free Zone (SCHLUMBERGER FZ REPORT PREVIEW)
+              </h3>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => { setFzExtractedData(null); }}
+                  className="px-6 py-2 bg-white border-2 border-slate-900 text-slate-900 text-[10px] font-bold uppercase transition-all active-neo-brutalism shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] hover:bg-slate-50"
+                >
+                  Discard
+                </button>
+                <button 
+                  onClick={handleConfirmFz}
+                  className="px-8 py-2 border-2 border-slate-900 text-[10px] bg-emerald-600 text-white hover:bg-emerald-700 font-bold uppercase transition-all active-neo-brutalism shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]"
+                >
+                  Confirm & Commit Report ({fzExtractedData.length} items)
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 bg-amber-50/50 border-b-2 border-slate-900 flex items-center gap-2">
+              <AlertCircle className="w-4.5 h-4.5 text-amber-600" />
+              <p className="text-[10px] font-sans text-amber-800 font-bold uppercase tracking-wide">
+                📄 รายการเหล่านี้จะถูก บันทึก / อัปเดต สู่ Master Inventory โดยอัตโนมัติด้วยสถานะ IN และพิกัดจัดเก็บจัดเป็น Free Zone
+              </p>
+            </div>
+
+            <div className="max-h-[500px] overflow-y-auto p-4 bg-slate-50">
+              <table className="w-full text-left border-collapse bg-white border-2 border-slate-900">
+                <thead className="sticky top-0 bg-slate-900 text-white select-none">
+                  <tr>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">Line Item</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">Inbound Number</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">Inbound Date</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">Description</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-center">Unit Type (UOM)</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-center">Qty</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-center">COO (Value)</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-center">Segment</th>
+                  </tr>
+                </thead>
+                <tbody className="text-[11px] font-mono divide-y divide-slate-200">
+                  {fzExtractedData.map((item, idx) => {
+                    const serialMatch = item.description.match(/\(SERIAL\s*:\s*([^)]+)\)/i);
+                    const serial = serialMatch ? serialMatch[1].trim() : '';
+
+                    return (
+                      <tr key={idx} className="hover:bg-slate-100/50 transition-colors">
+                        <td className="px-4 py-3 text-slate-500 font-bold text-center select-none">{item.itemNumber}</td>
+                        <td className="px-4 py-3 text-blue-600 font-bold">{item.inboundNumber}</td>
+                        <td className="px-4 py-3 text-slate-800 font-bold">{item.inboundDate || '-'}</td>
+                        <td className="px-4 py-3 text-slate-900 font-sans font-medium">
+                          <p className="font-bold leading-tight">{item.description}</p>
+                          {serial && (
+                            <span className="inline-block mt-1 px-1.5 py-0.5 bg-purple-50 border border-purple-300 text-purple-700 text-[9px] font-black tracking-widest uppercase font-mono shadow-sm">
+                              📌 Serial Match: {serial}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center text-slate-650 font-bold uppercase">{item.unitType}</td>
+                        <td className="px-4 py-3 text-center text-slate-900 font-bold">{item.quantity}</td>
+                        <td className="px-4 py-3 text-center text-slate-700 font-black uppercase">{item.value || '-'}</td>
+                        <td className="px-4 py-3 text-center text-slate-700 font-bold">{item.dutyIncome || '-'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </motion.div>
         )}
 

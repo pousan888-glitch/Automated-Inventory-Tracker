@@ -61,6 +61,7 @@ export interface InventoryItem {
   lastUpdate: any; // Firestore Timestamp
   importEntryNo?: string;
   importEntryLineNo?: string;
+  inboundDate?: string;
   
   // Administrative fields from CIPL and PDF
   coo?: string;
@@ -95,6 +96,7 @@ export interface TransactionLog {
   lineItem: string;
   importEntryNo: string;
   importEntryLineNo: string;
+  inboundDate?: string;
 
   // Additional fields for auditing matching items
   coo?: string;
@@ -395,6 +397,80 @@ export async function importMasterInventory(items: Array<Partial<InventoryItem>>
       if (item.customsStatus) cleanItem.customsStatus = String(item.customsStatus).trim();
 
       batch.set(inventoryRef, cleanItem, { merge: true });
+    });
+
+    await batch.commit();
+  }
+}
+
+export async function importFzInventoryReport(
+  items: Array<{
+    inboundNumber: string;
+    itemNumber: string;
+    inboundDate: string;
+    description: string;
+    unitType: string;
+    quantity: number;
+    value: string; // COO
+    dutyIncome: string; // segment
+  }>
+) {
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    throw new Error('User must be authenticated to import FZ inventory reports.');
+  }
+
+  for (let i = 0; i < items.length; i += 500) {
+    const batch = writeBatch(db);
+    const chunk = items.slice(i, i + 500);
+
+    chunk.forEach((item) => {
+      const inboundNumber = (item.inboundNumber || '').trim();
+      const itemNumber = (item.itemNumber || '').trim();
+      const rawDescription = (item.description || '').trim();
+      const inboundDate = (item.inboundDate || '').trim();
+      const uom = (item.unitType || 'EA').trim();
+      const qty = Number(item.quantity) || 1;
+      const coo = (item.value || '').trim();
+      const segment = (item.dutyIncome || '').trim();
+
+      // Extract serial from description if possible
+      let serialNo = '';
+      const serialMatch = rawDescription.match(/\(SERIAL\s*:\s*([^)]+)\)/i);
+      if (serialMatch && serialMatch[1]) {
+        serialNo = serialMatch[1].trim();
+      }
+
+      // If no serial, generate from inbound number and item number
+      if (!serialNo) {
+        serialNo = `FZ-${inboundNumber || 'INBOUND'}-L${itemNumber || '1'}`;
+      }
+
+      const docId = `${userId}_${serialNo.replace(/\//g, '_')}`;
+      const inventoryRef = doc(db, 'inventory', docId);
+
+      const fzItem: any = {
+        userId,
+        serialNo,
+        partNo: 'N/A',
+        description: rawDescription || 'No Description',
+        status: 'IN',
+        currentLocation: 'Free Zone',
+        lastUpdate: serverTimestamp(),
+        importEntryNo: inboundNumber,
+        importEntryLineNo: itemNumber,
+        inboundDate: inboundDate,
+        coo: coo,
+        uom: uom,
+        qty: qty,
+        segment: segment,
+        lineItem: itemNumber,
+        customEntry: inboundNumber,
+        customsStatus: 'FZ',
+        invoiceNo: 'FZ-REPORT'
+      };
+
+      batch.set(inventoryRef, fzItem, { merge: true });
     });
 
     await batch.commit();

@@ -36,7 +36,8 @@ export function exportItemsToExcel(items: InventoryItem[], filename = 'inventory
     'ibase',           // 26
     'Remark',          // 27
     'Import Entry No', // 28
-    'Import Entry Line'// 29
+    'Import Entry Line',// 29
+    'Inbound Date'     // 30
   ];
 
   const formatUSD = (val: number | undefined) => {
@@ -81,7 +82,8 @@ export function exportItemsToExcel(items: InventoryItem[], filename = 'inventory
       item.ibase || '',                       // 26
       item.remark || '',                      // 27
       item.importEntryNo || '',               // 28
-      item.importEntryLineNo || ''            // 29
+      item.importEntryLineNo || '',           // 29
+      item.inboundDate || ''                  // 30
     ];
   });
 
@@ -193,7 +195,19 @@ export function generateItemsTSV(items: InventoryItem[]): string {
     'UNIT PRICE',      // 15
     'AMOUNT',          // 16
     'Item Weight',     // 17
-    'Meaning in Thai'  // 18
+    'Meaning in Thai', // 18
+    'Dimention',       // 19
+    'Package',         // 20
+    'Status',          // 21
+    'Custom entry',    // 22
+    'Destination',     // 23
+    'Vessel',          // 24
+    'Segment',         // 25
+    'ibase',           // 26
+    'Remark',          // 27
+    'Import Entry No', // 28
+    'Import Entry Line',// 29
+    'Inbound Date'     // 30
   ];
 
   const formatUSD = (val: number | undefined) => {
@@ -227,7 +241,19 @@ export function generateItemsTSV(items: InventoryItem[]): string {
       formatUSD(unitPriceVal),                // 15
       formatUSD(amountVal),                   // 16
       item.itemWeight !== undefined ? String(item.itemWeight) : '', // 17
-      item.meaningInThai || ''                // 18
+      item.meaningInThai || '',               // 18
+      item.dimension || '',                   // 19
+      item.package || '',                     // 20
+      item.status || '',                      // 21
+      item.customEntry || '',                 // 22
+      item.currentLocation || 'In-Base',      // 23
+      item.vessel || '',                      // 24
+      item.segment || '',                     // 25
+      item.ibase || '',                       // 26
+      item.remark || '',                      // 27
+      item.importEntryNo || '',               // 28
+      item.importEntryLineNo || '',           // 29
+      item.inboundDate || ''                  // 30
     ];
 
     return vals.map(val => {
