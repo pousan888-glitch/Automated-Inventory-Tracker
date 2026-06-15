@@ -34,7 +34,8 @@ import {
   wipeAllData,
   updateInventoryItem,
   importMasterInventory,
-  addManualInventoryItem
+  addManualInventoryItem,
+  getDisplaySerial
 } from '../lib/inventoryService';
 import * as XLSX from 'xlsx';
 import { exportItemsToExcel, exportLogsToExcel, generateItemsTSV } from '../lib/exportUtils';
@@ -88,6 +89,103 @@ export function InventoryList() {
   });
   const [isManualSaving, setIsManualSaving] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
+
+  const [autofillFeedback, setAutofillFeedback] = useState<string | null>(null);
+  const [activeSuggestionField, setActiveSuggestionField] = useState<'serial' | 'part' | 'desc' | null>(null);
+
+  // Helper to get suggestions based on user input
+  const getSerialSuggestions = (val: string) => {
+    if (!val || val.trim().length < 2) return [];
+    const searchVal = val.trim().toUpperCase();
+    const matches: InventoryItem[] = [];
+    const seen = new Set<string>();
+    for (const item of items) {
+      if (item.serialNo && item.serialNo.toUpperCase().includes(searchVal)) {
+        const canonical = item.serialNo.trim().toUpperCase();
+        if (!seen.has(canonical)) {
+          seen.add(canonical);
+          matches.push(item);
+          if (matches.length >= 6) break;
+        }
+      }
+    }
+    return matches;
+  };
+
+  const getPartSuggestions = (val: string) => {
+    if (!val || val.trim().length < 2) return [];
+    const searchVal = val.trim().toUpperCase();
+    const matches: InventoryItem[] = [];
+    const seen = new Set<string>();
+    for (const item of items) {
+      if (item.partNo && item.partNo.toUpperCase().includes(searchVal)) {
+        const canonical = item.partNo.trim().toUpperCase();
+        if (!seen.has(canonical)) {
+          seen.add(canonical);
+          matches.push(item);
+          if (matches.length >= 6) break;
+        }
+      }
+    }
+    return matches;
+  };
+
+  const getDescSuggestions = (val: string) => {
+    if (!val || val.trim().length < 2) return [];
+    const searchVal = val.trim().toUpperCase();
+    const matches: InventoryItem[] = [];
+    const seen = new Set<string>();
+    for (const item of items) {
+      if (item.description && item.description.toUpperCase().includes(searchVal)) {
+        const key = `${(item.description || '').trim().toUpperCase()}_${(item.partNo || '').trim().toUpperCase()}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          matches.push(item);
+          if (matches.length >= 6) break;
+        }
+      }
+    }
+    return matches;
+  };
+
+  const applyTemplate = (selected: InventoryItem, sourceField: string) => {
+    setManualItem(prev => {
+      const updatedPrice = selected.unitPrice !== undefined ? Number(selected.unitPrice) : prev.unitPrice || 0;
+      const updatedQty = prev.qty !== undefined ? Number(prev.qty) : 1;
+      return {
+        ...prev,
+        serialNo: sourceField === 'serial' ? (selected.serialNo || prev.serialNo) : prev.serialNo,
+        partNo: selected.partNo || prev.partNo,
+        description: selected.description || prev.description,
+        coo: selected.coo || prev.coo,
+        hsCode: selected.hsCode || prev.hsCode,
+        eccn: selected.eccn || prev.eccn,
+        uom: selected.uom || prev.uom,
+        unitPrice: updatedPrice,
+        amount: updatedPrice * updatedQty,
+        itemWeight: selected.itemWeight || prev.itemWeight,
+        meaningInThai: selected.meaningInThai || prev.meaningInThai,
+        dimension: selected.dimension || prev.dimension,
+        package: selected.package || prev.package,
+        segment: selected.segment || prev.segment,
+        ibase: selected.ibase || prev.ibase,
+        customsStatus: selected.customsStatus || prev.customsStatus,
+        currentLocation: selected.currentLocation || prev.currentLocation,
+        customEntry: selected.customEntry || prev.customEntry || selected.importEntryNo,
+        importEntryNo: selected.importEntryNo || prev.importEntryNo || selected.customEntry,
+        importEntryLineNo: selected.importEntryLineNo || prev.importEntryLineNo || selected.lineItem,
+        lineItem: selected.lineItem || prev.lineItem || selected.importEntryLineNo,
+        inboundDate: selected.inboundDate || prev.inboundDate,
+        vessel: selected.vessel || prev.vessel,
+        remark: selected.remark || prev.remark,
+      };
+    });
+    setAutofillFeedback(`ดึงข้อมูลอัตโนมัติจากสินค้าต้นแบบสำเร็จ! (จากฟิลด์ ${sourceField === 'serial' ? 'S/N' : sourceField === 'part' ? 'Part Ref' : 'Description'})`);
+    setActiveSuggestionField(null);
+    setTimeout(() => {
+      setAutofillFeedback(null);
+    }, 4000);
+  };
 
 
   useEffect(() => {
@@ -184,15 +282,13 @@ export function InventoryList() {
   };
 
   const handleSaveManualItem = async () => {
-    if (!manualItem.serialNo?.trim()) {
-      setManualError('กรุณากรอกหมายเลขซีเรียล (Serial Number) เสมอ');
-      return;
-    }
-    const serialUpper = manualItem.serialNo.trim().toUpperCase();
-    const exists = items.some(item => item.serialNo.toUpperCase() === serialUpper);
-    if (exists) {
-      setManualError(`ไม่สามารถบันทึกได้เนื่องจากซีเรียลหมายเลข "${manualItem.serialNo}" มีอยู่ในระบบแล้ว`);
-      return;
+    const serialUpper = (manualItem.serialNo || '').trim().toUpperCase();
+    if (serialUpper && serialUpper !== 'N/A') {
+      const exists = items.some(item => item.serialNo.toUpperCase() === serialUpper);
+      if (exists) {
+        setManualError(`ไม่สามารถบันทึกได้เนื่องจากซีเรียลหมายเลข "${manualItem.serialNo}" มีอยู่ในระบบแล้ว`);
+        return;
+      }
     }
 
     setIsManualSaving(true);
@@ -226,7 +322,7 @@ export function InventoryList() {
         invoiceNo: 'MANUAL-ADD',
         customsStatus: ''
       });
-      setCopyNotification(`เพิ่มสินค้าซีเรียล "${serialUpper}" เรียบร้อยแล้ว!`);
+      setCopyNotification(serialUpper ? `เพิ่มสินค้าซีเรียล "${serialUpper}" เรียบร้อยแล้ว!` : 'เพิ่มสินค้าใหม่เรียบร้อยแล้ว!');
       setTimeout(() => setCopyNotification(null), 5000);
     } catch (err: any) {
       console.error("Error manually adding item: ", err);
@@ -580,7 +676,7 @@ export function InventoryList() {
 
                               {/* Serial No */}
                               <td className="px-4 py-3 text-xs font-sans font-black tracking-tighter text-blue-600 break-all select-all">
-                                {item.serialNo || 'N/A'}
+                                {getDisplaySerial(item.serialNo)}
                               </td>
 
                               {/* Description */}
@@ -693,7 +789,7 @@ export function InventoryList() {
 
                         {/* Serial Number (Asset ID) */}
                         <p className="text-[11px] font-black font-mono tracking-tighter text-slate-900 break-all bg-slate-50 border-2 border-slate-900/10 px-2 py-0.5 mb-2 leading-none">
-                          {item.serialNo}
+                          {getDisplaySerial(item.serialNo)}
                         </p>
 
                         {/* Description and Part */}
@@ -845,7 +941,7 @@ export function InventoryList() {
                 </span>
               </div>
               <h3 className="text-xl md:text-2xl font-black font-mono tracking-tighter uppercase break-all">
-                {tempItem.serialNo}
+                {getDisplaySerial(tempItem.serialNo)}
               </h3>
             </div>
 
@@ -1302,6 +1398,16 @@ export function InventoryList() {
                 </div>
               )}
 
+              {autofillFeedback && (
+                <div className="bg-emerald-50 border-2 border-emerald-500 p-4 flex items-start gap-3 shadow-[2px_2px_0px_0px_rgba(16,185,129,1)]">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-emerald-900 font-sans">ดึงข้อมูลอัตโนมัติสำเร็จ (Autofill Active)</h4>
+                    <p className="text-[11px] font-bold text-emerald-800 mt-1">{autofillFeedback}</p>
+                  </div>
+                </div>
+              )}
+
               {/* SECTION 1: CORE ITEM DETAILS */}
               <div className="bg-white border-2 border-slate-900 p-5 rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-4">
                 <div className="border-b-2 border-slate-900 pb-2 flex items-center gap-2">
@@ -1310,27 +1416,88 @@ export function InventoryList() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">หมายเลขซีเรียล (SERIAL NUMBER / S/N) <span className="text-red-500">*</span></label>
+                  <div className="space-y-1 relative">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">หมายเลขซีเรียล (SERIAL NUMBER / S/N) <span className="text-blue-500 font-bold">(หากไม่มีจะระบุเป็น N/A)</span></label>
                     <input 
                       type="text" 
                       value={manualItem.serialNo || ''} 
-                      onChange={(e) => setManualItem({ ...manualItem, serialNo: e.target.value.trim() })}
+                      onChange={(e) => {
+                        setManualItem({ ...manualItem, serialNo: e.target.value });
+                        setActiveSuggestionField('serial');
+                      }}
+                      onFocus={() => setActiveSuggestionField('serial')}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          if (activeSuggestionField === 'serial') setActiveSuggestionField(null);
+                        }, 200);
+                      }}
                       className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-950 font-mono text-xs font-black uppercase focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
-                      placeholder="เช่น S/N-9999-XYZ"
-                      required
+                      placeholder="เช่น S/N-9999-XYZ (เว้นว่างได้)"
                     />
+                    {/* Serial Suggestion Panel */}
+                    {activeSuggestionField === 'serial' && getSerialSuggestions(manualItem.serialNo || '').length > 0 && (
+                      <div className="absolute left-0 right-0 z-50 bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] mt-1 max-h-60 overflow-y-auto divide-y divide-slate-200">
+                        {getSerialSuggestions(manualItem.serialNo || '').map((item) => (
+                          <button
+                            key={item.serialNo}
+                            type="button"
+                            onMouseDown={() => applyTemplate(item, 'serial')}
+                            className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors flex flex-col gap-0.5 cursor-pointer"
+                          >
+                            <span className="text-[10px] font-black text-blue-600 font-mono uppercase">{getDisplaySerial(item.serialNo)}</span>
+                            <span className="text-[9.5px] font-bold text-slate-800 line-clamp-1">{item.description}</span>
+                            <div className="flex gap-2 text-[8px] font-mono font-bold text-slate-500 uppercase">
+                              {item.partNo && <span>Part: {item.partNo}</span>}
+                              {item.unitPrice !== undefined && <span>Price: ${item.unitPrice}</span>}
+                              {item.uom && <span>UOM: {item.uom}</span>}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
                     <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">รหัสอะไหล่ (PART REF / NUMBER)</label>
                     <input 
                       type="text" 
                       value={manualItem.partNo || ''} 
-                      onChange={(e) => setManualItem({ ...manualItem, partNo: e.target.value.trim() })}
+                      onChange={(e) => {
+                        setManualItem({ ...manualItem, partNo: e.target.value.trim() });
+                        setActiveSuggestionField('part');
+                      }}
+                      onFocus={() => setActiveSuggestionField('part')}
+                      onBlur={() => {
+                        setTimeout(() => {
+                          if (activeSuggestionField === 'part') setActiveSuggestionField(null);
+                        }, 200);
+                      }}
                       className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-950 font-mono text-xs font-bold uppercase focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
                       placeholder="เช่น 100234567"
                     />
+                    {/* Part Suggestion Panel */}
+                    {activeSuggestionField === 'part' && getPartSuggestions(manualItem.partNo || '').length > 0 && (
+                      <div className="absolute left-0 right-0 z-50 bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] mt-1 max-h-60 overflow-y-auto divide-y divide-slate-200">
+                        {getPartSuggestions(manualItem.partNo || '').map((item, idx) => (
+                          <button
+                            key={`${item.serialNo}-${item.partNo || idx}`}
+                            type="button"
+                            onMouseDown={() => applyTemplate(item, 'part')}
+                            className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors flex flex-col gap-0.5 cursor-pointer"
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black text-slate-900 font-mono uppercase">PART: {item.partNo}</span>
+                              <span className="text-[8px] font-mono font-black uppercase text-blue-600 bg-blue-50 px-1 border border-blue-200">{getDisplaySerial(item.serialNo)}</span>
+                            </div>
+                            <span className="text-[9.5px] font-bold text-slate-800 line-clamp-1">{item.description}</span>
+                            <div className="flex gap-2 text-[8px] font-mono font-bold text-slate-500 uppercase">
+                              {item.unitPrice !== undefined && <span>Price: ${item.unitPrice}</span>}
+                              {item.uom && <span>UOM: {item.uom}</span>}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1">
@@ -1364,16 +1531,46 @@ export function InventoryList() {
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 relative">
                   <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">ชื่ออธิบายอังกฤษ (DESCRIPTION) <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
                     value={manualItem.description || ''} 
-                    onChange={(e) => setManualItem({ ...manualItem, description: e.target.value })}
+                    onChange={(e) => {
+                      setManualItem({ ...manualItem, description: e.target.value });
+                      setActiveSuggestionField('desc');
+                    }}
+                    onFocus={() => setActiveSuggestionField('desc')}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        if (activeSuggestionField === 'desc') setActiveSuggestionField(null);
+                      }, 200);
+                    }}
                     className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-950 font-sans text-xs font-bold uppercase focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
                     placeholder="เช่น TUBING PUMP INSERT ACCESSORIES"
                     required
                   />
+                  {/* Desc Suggestion Panel */}
+                  {activeSuggestionField === 'desc' && getDescSuggestions(manualItem.description || '').length > 0 && (
+                    <div className="absolute left-0 right-0 z-50 bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] mt-1 max-h-60 overflow-y-auto divide-y divide-slate-200">
+                      {getDescSuggestions(manualItem.description || '').map((item, idx) => (
+                        <button
+                          key={`${item.serialNo}-${item.description || idx}`}
+                          type="button"
+                          onMouseDown={() => applyTemplate(item, 'desc')}
+                          className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors flex flex-col gap-0.5 cursor-pointer"
+                        >
+                          <span className="text-[10px] font-black text-slate-900 uppercase line-clamp-1">{item.description}</span>
+                          <div className="flex flex-wrap gap-2 text-[8px] font-mono font-bold text-slate-500 uppercase mt-0.5">
+                            {item.partNo && <span className="text-blue-600">Part: {item.partNo}</span>}
+                            {item.serialNo && <span>S/N: {getDisplaySerial(item.serialNo)}</span>}
+                            {item.unitPrice !== undefined && <span>Price: ${item.unitPrice}</span>}
+                            {item.uom && <span>UOM: {item.uom}</span>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 

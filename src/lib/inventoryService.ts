@@ -85,6 +85,15 @@ export interface InventoryItem {
   customsStatus?: string;
 }
 
+export function getDisplaySerial(serialNo: string | undefined): string {
+  if (!serialNo) return 'N/A';
+  const s = serialNo.trim().toUpperCase();
+  if (s === 'N/A' || s.startsWith('N/A-') || s.startsWith('FZ-')) {
+    return 'N/A';
+  }
+  return serialNo;
+}
+
 export interface TransactionLog {
   userId?: string;
   date: any; // Firestore Timestamp
@@ -441,9 +450,10 @@ export async function importFzInventoryReport(
         serialNo = serialMatch[1].trim();
       }
 
-      // If no serial, generate from inbound number and item number
+      // If no serial, do not put invoice/inbound number in there. Just use a unique generated FZ N/A serial
       if (!serialNo) {
-        serialNo = `FZ-${inboundNumber || 'INBOUND'}-L${itemNumber || '1'}`;
+        const uniqueId = Math.random().toString(36).substring(2, 7).toUpperCase();
+        serialNo = `N/A-FZ-L${itemNumber || '1'}-${uniqueId}`;
       }
 
       const docId = `${userId}_${serialNo.replace(/\//g, '_')}`;
@@ -483,9 +493,10 @@ export async function addManualInventoryItem(item: Partial<InventoryItem>) {
     throw new Error('User must be authenticated to add custom inventory items.');
   }
 
-  const serialNo = (item.serialNo || '').trim();
-  if (!serialNo) {
-    throw new Error('Serial Number (S/N) is required.');
+  let serialNo = (item.serialNo || '').trim();
+  if (!serialNo || serialNo.toUpperCase() === 'N/A') {
+    const uniqueId = Math.random().toString(36).substring(2, 7).toUpperCase();
+    serialNo = `N/A-MANUAL-${uniqueId}`;
   }
 
   const partNo = (item.partNo || '').trim() || 'N/A';

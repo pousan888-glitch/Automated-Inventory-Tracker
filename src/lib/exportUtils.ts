@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { InventoryItem, TransactionLog } from './inventoryService';
+import { InventoryItem, TransactionLog, getDisplaySerial } from './inventoryService';
 
 /**
  * Utility to convert raw database items into beautifully labeled Excel structures 
@@ -55,7 +55,7 @@ export function exportItemsToExcel(items: InventoryItem[], filename = 'inventory
     return [
       item.lineItem || String(idx + 1),       // 0
       item.partNo || '',                      // 1
-      item.serialNo || '',                    // 2
+      getDisplaySerial(item.serialNo),        // 2
       item.description || '',                 // 3
       '',                                     // 4
       '',                                     // 5
@@ -225,7 +225,7 @@ export function generateItemsTSV(items: InventoryItem[]): string {
     const vals = [
       item.lineItem || String(idx + 1),       // 0
       item.partNo || '',                      // 1
-      item.serialNo || '',                    // 2
+      getDisplaySerial(item.serialNo),        // 2
       item.description || '',                 // 3
       '',                                     // 4
       '',                                     // 5
