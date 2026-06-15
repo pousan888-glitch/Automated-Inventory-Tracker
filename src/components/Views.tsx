@@ -33,7 +33,8 @@ import {
   TransactionLog,
   wipeAllData,
   updateInventoryItem,
-  importMasterInventory
+  importMasterInventory,
+  addManualInventoryItem
 } from '../lib/inventoryService';
 import * as XLSX from 'xlsx';
 import { exportItemsToExcel, exportLogsToExcel, generateItemsTSV } from '../lib/exportUtils';
@@ -56,6 +57,37 @@ export function InventoryList() {
   const [selectedSerials, setSelectedSerials] = useState<string[]>([]);
   const [modalTab, setModalTab] = useState<'profile' | 'history'>('profile');
   const [copyNotification, setCopyNotification] = useState<string | null>(null);
+
+  // Manual Add Item States
+  const [isManualAddOpen, setIsManualAddOpen] = useState(false);
+  const [manualItem, setManualItem] = useState<Partial<InventoryItem>>({
+    serialNo: '',
+    partNo: '',
+    description: '',
+    status: 'IN',
+    currentLocation: 'In-Base',
+    coo: '',
+    hsCode: '',
+    eccn: '',
+    qty: 1,
+    uom: 'EA',
+    unitPrice: 0,
+    amount: 0,
+    itemWeight: '',
+    meaningInThai: '',
+    dimension: '',
+    package: '',
+    customEntry: '',
+    vessel: '',
+    segment: '',
+    ibase: '',
+    remark: '',
+    lineItem: '',
+    invoiceNo: '',
+    customsStatus: ''
+  });
+  const [isManualSaving, setIsManualSaving] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -148,6 +180,59 @@ export function InventoryList() {
       console.error("Error saving item configuration profile: ", err);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveManualItem = async () => {
+    if (!manualItem.serialNo?.trim()) {
+      setManualError('กรุณากรอกหมายเลขซีเรียล (Serial Number) เสมอ');
+      return;
+    }
+    const serialUpper = manualItem.serialNo.trim().toUpperCase();
+    const exists = items.some(item => item.serialNo.toUpperCase() === serialUpper);
+    if (exists) {
+      setManualError(`ไม่สามารถบันทึกได้เนื่องจากซีเรียลหมายเลข "${manualItem.serialNo}" มีอยู่ในระบบแล้ว`);
+      return;
+    }
+
+    setIsManualSaving(true);
+    setManualError(null);
+    try {
+      await addManualInventoryItem(manualItem);
+      setIsManualAddOpen(false);
+      setManualItem({
+        serialNo: '',
+        partNo: '',
+        description: '',
+        status: 'IN',
+        currentLocation: 'In-Base',
+        coo: '',
+        hsCode: '',
+        eccn: '',
+        qty: 1,
+        uom: 'EA',
+        unitPrice: 0,
+        amount: 0,
+        itemWeight: '',
+        meaningInThai: '',
+        dimension: '',
+        package: '',
+        customEntry: '',
+        vessel: '',
+        segment: '',
+        ibase: '',
+        remark: '',
+        lineItem: '',
+        invoiceNo: 'MANUAL-ADD',
+        customsStatus: ''
+      });
+      setCopyNotification(`เพิ่มสินค้าซีเรียล "${serialUpper}" เรียบร้อยแล้ว!`);
+      setTimeout(() => setCopyNotification(null), 5000);
+    } catch (err: any) {
+      console.error("Error manually adding item: ", err);
+      setManualError(err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+    } finally {
+      setIsManualSaving(false);
     }
   };
 
@@ -314,6 +399,44 @@ export function InventoryList() {
             >
               <Download className="w-3.5 h-3.5" />
               <span>ดาวน์โหลดไฟล์ Excel</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setManualError(null);
+                setManualItem({
+                  serialNo: '',
+                  partNo: '',
+                  description: '',
+                  status: 'IN',
+                  currentLocation: 'In-Base',
+                  coo: '',
+                  hsCode: '',
+                  eccn: '',
+                  qty: 1,
+                  uom: 'EA',
+                  unitPrice: 0,
+                  amount: 0,
+                  itemWeight: '',
+                  meaningInThai: '',
+                  dimension: '',
+                  package: '',
+                  customEntry: '',
+                  vessel: '',
+                  segment: '',
+                  ibase: '',
+                  remark: '',
+                  lineItem: '',
+                  invoiceNo: 'MANUAL-ADD',
+                  customsStatus: ''
+                });
+                setIsManualAddOpen(true);
+              }}
+              className="px-4 py-2 border-2 border-slate-900 bg-blue-600 hover:bg-blue-700 text-white font-black text-[9px] uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+              title="เพิ่มรายการสินค้าใหม่เข้าสู่คลังแบบกรอกเอง (Add Item Manually)"
+            >
+              <Package className="w-3.5 h-3.5" />
+              <span>เพิ่มสินค้าด้วยตัวเอง (Manual Add)</span>
             </button>
           </div>
 
@@ -1120,6 +1243,413 @@ export function InventoryList() {
                   className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white border-2 border-slate-900 text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
                 >
                   ปิดหน้าต่างแผงควบคุม
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ➕ Pop-up Manual Add Item Modal Panel */}
+      {isManualAddOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => {
+            if (!isManualSaving) {
+              setIsManualAddOpen(false);
+            }
+          }}
+        >
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white border-4 border-slate-900 w-full max-w-4xl neo-brutalism-shadow relative my-8 flex flex-col max-h-[90vh] overflow-hidden rounded-none shadow-[6px_6px_0px_0px_rgba(15,23,42,1)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button 
+              onClick={() => {
+                if (!isManualSaving) {
+                  setIsManualAddOpen(false);
+                }
+              }}
+              className="absolute top-4 right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1.5 transition-colors neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 z-10 cursor-pointer"
+              aria-label="Close dialog"
+              disabled={isManualSaving}
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white p-6 pr-16 shrink-0">
+              <span className="text-[9px] uppercase font-black bg-blue-600 text-white px-2 py-0.5 border border-blue-400 font-mono tracking-widest">
+                เพิ่มข้อมูลสินค้าแมนนวล (MANUAL ITEM CREATION WORKSPACE)
+              </span>
+              <h3 className="text-xl md:text-2xl font-black font-sans tracking-tight uppercase mt-1">
+                สร้างรายการสินค้าใหม่ด้วยตนเอง
+              </h3>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 space-y-6">
+              {manualError && (
+                <div className="bg-red-50 border-2 border-red-900 p-4 flex items-start gap-3">
+                  <ShieldAlert className="w-5 h-5 text-red-700 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-red-900 font-sans">เกิดข้อผิดพลาดในการตรวจสอบ</h4>
+                    <p className="text-[11px] font-bold text-red-800 mt-1">{manualError}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION 1: CORE ITEM DETAILS */}
+              <div className="bg-white border-2 border-slate-900 p-5 rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-4">
+                <div className="border-b-2 border-slate-900 pb-2 flex items-center gap-2">
+                  <Package className="w-5 h-5 text-blue-600" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 font-sans">1. ข้อมูลหลักของสินค้า (Core Item Details)</h4>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">หมายเลขซีเรียล (SERIAL NUMBER / S/N) <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" 
+                      value={manualItem.serialNo || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, serialNo: e.target.value.trim() })}
+                      className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-950 font-mono text-xs font-black uppercase focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น S/N-9999-XYZ"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">รหัสอะไหล่ (PART REF / NUMBER)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.partNo || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, partNo: e.target.value.trim() })}
+                      className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-950 font-mono text-xs font-bold uppercase focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น 100234567"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase block">ทิศทาง / สถานะ (STATUS DIRECTION)</label>
+                    <div className="grid grid-cols-2 gap-2 h-[38px]">
+                      <button
+                        type="button"
+                        onClick={() => setManualItem({ ...manualItem, status: 'IN' })}
+                        className={cn(
+                          "border-2 font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer rounded-none",
+                          manualItem.status === 'IN'
+                            ? "bg-emerald-600 border-slate-900 text-white shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]"
+                            : "bg-white border-slate-300 hover:border-slate-800 text-slate-600"
+                        )}
+                      >
+                        เข้าคลัง (IN)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setManualItem({ ...manualItem, status: 'OUT' })}
+                        className={cn(
+                          "border-2 font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer rounded-none",
+                          manualItem.status === 'OUT'
+                            ? "bg-red-600 border-slate-900 text-white shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]"
+                            : "bg-white border-slate-300 hover:border-slate-800 text-slate-600"
+                        )}
+                      >
+                        ออกคลัง (OUT)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">ชื่ออธิบายอังกฤษ (DESCRIPTION) <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    value={manualItem.description || ''} 
+                    onChange={(e) => setManualItem({ ...manualItem, description: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-950 font-sans text-xs font-bold uppercase focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                    placeholder="เช่น TUBING PUMP INSERT ACCESSORIES"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* SECTION 2: CUSTOMS & LOGISTICS */}
+              <div className="bg-white border-2 border-slate-900 p-5 rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-4">
+                <div className="border-b-2 border-slate-900 pb-2 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-purple-600" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 font-sans">2. ข้อมูลการศุลกากรและพิกัดจัดเก็บ (Customs & Location Details)</h4>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">หมายเลขสำแดงใบขน (CUSTOMS ENTRY / IMPORT ENTRY NO)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.customEntry || ''} 
+                      onChange={(e) => setManualItem({ 
+                        ...manualItem, 
+                        customEntry: e.target.value.trim(),
+                        importEntryNo: e.target.value.trim()
+                      })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น A012-06406-xxxxx"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">ลำดับรายการในใบขน (IMPORT ENTRY LINE / LINE ITEM)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.lineItem || ''} 
+                      onChange={(e) => setManualItem({ 
+                        ...manualItem, 
+                        lineItem: e.target.value.trim(),
+                        importEntryLineNo: e.target.value.trim()
+                      })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น 1 หรือ 45"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">วันนำเข้า/เคลียร์สินค้า (INBOUND DATE)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.inboundDate || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, inboundDate: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น 24/12/2025"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">สิทธิ์ทางศุลกากร (CUSTOMS STATUS)</label>
+                    <select
+                      value={manualItem.customsStatus || ''}
+                      onChange={(e) => setManualItem({ ...manualItem, customsStatus: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none rounded-none text-slate-900 h-[34px]"
+                    >
+                      <option value="">-- เลือกสิทธิ์ศุลกากร --</option>
+                      <option value="Local">Local (เสียภาษีปกติ)</option>
+                      <option value="FZ">FZ (เขตปลอดอากร Free Zone)</option>
+                      <option value="Drawback">Drawback (ขอคืนอากร ม.29)</option>
+                      <option value="19 Bis">19 Bis (สิทธิ์ 19 ทวิ)</option>
+                      <option value="BOI">BOI (ได้รับการส่งเสริมการลงทุน)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">แหล่งกำเนิดสินค้า (COUNTRY OF ORIGIN / COO)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.coo || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, coo: e.target.value.toUpperCase() })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น US, TH, SG, CN"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">พิกัดสถานที่เก็บปัจจุบัน (CURRENT LOCATION)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.currentLocation || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, currentLocation: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น In-Base หรือ Free Zone"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">เซกเมนต์วิชาความรู้ (SEGMENT)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.segment || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, segment: e.target.value.toUpperCase() })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น D&M, SLK, SPS"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">รหัส IBASE (IBASE CODE/NUMBER)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.ibase || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, ibase: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น 123445"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">ใบกำกับสินค้า/อินวอยซ์อ้างอิง (INVOICE REF/NO)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.invoiceNo || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, invoiceNo: e.target.value.trim() })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น CIPL-9999-MANUAL"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: COMMERCIAL & PHYSICAL SPECIFICATION */}
+              <div className="bg-white border-2 border-slate-900 p-5 rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] space-y-4">
+                <div className="border-b-2 border-slate-900 pb-2 flex items-center gap-2">
+                  <Database className="w-5 h-5 text-emerald-600" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 font-sans">3. รายละเอียดทางการค้าและขนาดสินค้า (Commercial & Physical Specs)</h4>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">จำนวนที่แอด (QTY OF ITEM)</label>
+                    <input 
+                      type="number" 
+                      value={manualItem.qty || 1} 
+                      onChange={(e) => setManualItem({ ...manualItem, qty: Math.max(1, Number(e.target.value)) })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">หน่วยนับ (UNIT / UOM)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.uom || 'EA'} 
+                      onChange={(e) => setManualItem({ ...manualItem, uom: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900 text-center uppercase"
+                      placeholder="เช่น EA, SET, BOX"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">ราคาต่อหน่วย (UNIT PRICE USD)</label>
+                    <input 
+                      type="number" 
+                      value={manualItem.unitPrice || 0} 
+                      onChange={(e) => {
+                        const price = Number(e.target.value);
+                        const qty = manualItem.qty || 1;
+                        setManualItem({ 
+                          ...manualItem, 
+                          unitPrice: price,
+                          amount: price * qty
+                        });
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">มูลค่ารวม (TOTAL AMOUNT USD)</label>
+                    <input 
+                      type="number" 
+                      value={manualItem.amount || 0} 
+                      onChange={(e) => setManualItem({ ...manualItem, amount: Number(e.target.value) })}
+                      className="w-full px-2.5 py-1.5 bg-slate-100 border-2 border-slate-900 font-mono text-xs font-bold focus:outline-none rounded-none text-slate-900"
+                      disabled
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">ขนาดทางกายภาพ (DIMENSIONS)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.dimension || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, dimension: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น 120 x 80 x 50 CM"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">ชนิดของบรรจุภัณฑ์ (PACKAGE TYPE)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.package || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, package: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น WOODEN BOX, PALLET"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">ขนส่งเรือ/เครื่องบิน (VESSEL NAME)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.vessel || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, vessel: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น FLIGHT TG-xxx"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">น้ำหนักสินค้าชิ้นนั้น (ITEM WEIGHT)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.itemWeight || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, itemWeight: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น 450 KGS"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">แปลข้อมูลความหมายไทย (MEANING IN THAI)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.meaningInThai || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, meaningInThai: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น วาล์วสำหรับอุปกรณ์ควบคุมปั๊มแรงดัน"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">หมายเหตุเพิ่มเติมของแอดมิน (REMARKS)</label>
+                    <input 
+                      type="text" 
+                      value={manualItem.remark || ''} 
+                      onChange={(e) => setManualItem({ ...manualItem, remark: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 rounded-none text-slate-900"
+                      placeholder="เช่น ส่งพิกัดสิทธิ์ศุลกากรเร่งรัดพิเศษ"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer Controls */}
+            <div className="p-4 bg-white border-t-4 border-slate-900 flex justify-between items-center px-6 shrink-0 flex-wrap gap-4 select-none">
+              <span className="text-[9.5px] font-sans font-extrabold text-slate-400">
+                ⚠️ การคลิกปุ่มบันทึกจะสร้าง Log ประวัติเข้าคลัง MANUAL-ENTRY โดยอัตโนมัติ
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsManualAddOpen(false)}
+                  disabled={isManualSaving}
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-900 border-2 border-slate-900 text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                >
+                  ยกเลิก (Cancel)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveManualItem}
+                  disabled={isManualSaving}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white border-2 border-slate-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isManualSaving ? 'กำลังจัดเก็บสินค้า...' : 'บันทึกเพิ่มสินค้า (Save Item)'}</span>
                 </button>
               </div>
             </div>

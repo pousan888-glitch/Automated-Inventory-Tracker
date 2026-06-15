@@ -477,4 +477,97 @@ export async function importFzInventoryReport(
   }
 }
 
+export async function addManualInventoryItem(item: Partial<InventoryItem>) {
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    throw new Error('User must be authenticated to add custom inventory items.');
+  }
+
+  const serialNo = (item.serialNo || '').trim();
+  if (!serialNo) {
+    throw new Error('Serial Number (S/N) is required.');
+  }
+
+  const partNo = (item.partNo || '').trim() || 'N/A';
+  const description = (item.description || '').trim() || 'No Description';
+  const status = item.status === 'OUT' ? 'OUT' : 'IN';
+  const currentLocation = (item.currentLocation || 'In-Base').trim();
+  
+  const docId = `${userId}_${serialNo.replace(/\//g, '_')}`;
+  const inventoryRef = doc(db, 'inventory', docId);
+  const logRef = collection(db, 'logs');
+
+  const cleanItem: any = {
+    userId,
+    serialNo,
+    partNo,
+    description,
+    status,
+    currentLocation,
+    lastUpdate: serverTimestamp(),
+    invoiceNo: (item.invoiceNo || 'MANUAL-ADD').trim(),
+    importEntryNo: (item.importEntryNo || item.customEntry || '').trim(),
+    importEntryLineNo: (item.importEntryLineNo || '').trim(),
+    inboundDate: (item.inboundDate || '').trim(),
+    coo: (item.coo || '').trim(),
+    hsCode: (item.hsCode || '').trim(),
+    eccn: (item.eccn || '').trim(),
+    qty: item.qty !== undefined ? Number(item.qty) : 1,
+    uom: (item.uom || 'EA').trim(),
+    unitPrice: item.unitPrice !== undefined ? Number(item.unitPrice) : 0,
+    amount: item.amount !== undefined ? Number(item.amount) : 0,
+    itemWeight: item.itemWeight !== undefined ? item.itemWeight : '',
+    meaningInThai: (item.meaningInThai || '').trim(),
+    dimension: (item.dimension || '').trim(),
+    package: (item.package || '').trim(),
+    customEntry: (item.customEntry || item.importEntryNo || '').trim(),
+    vessel: (item.vessel || '').trim(),
+    segment: (item.segment || '').trim(),
+    ibase: (item.ibase || '').trim(),
+    remark: (item.remark || '').trim(),
+    lineItem: (item.lineItem || '').trim(),
+    customsStatus: (item.customsStatus || '').trim()
+  };
+
+  try {
+    await setDoc(inventoryRef, cleanItem, { merge: true });
+
+    // Also insert a transaction log
+    await addDoc(logRef, {
+      userId,
+      date: serverTimestamp(),
+      invoiceNo: cleanItem.invoiceNo,
+      transactionType: status,
+      serialNo,
+      origin: status === 'IN' ? 'MANUAL-ENTRY' : 'In-Base',
+      destination: currentLocation,
+      lineItem: cleanItem.lineItem,
+      importEntryNo: cleanItem.importEntryNo,
+      importEntryLineNo: cleanItem.importEntryLineNo,
+      inboundDate: cleanItem.inboundDate,
+      partNo,
+      description,
+      coo: cleanItem.coo,
+      hsCode: cleanItem.hsCode,
+      eccn: cleanItem.eccn,
+      qty: cleanItem.qty,
+      uom: cleanItem.uom,
+      unitPrice: cleanItem.unitPrice,
+      amount: cleanItem.amount,
+      itemWeight: cleanItem.itemWeight,
+      meaningInThai: cleanItem.meaningInThai,
+      dimension: cleanItem.dimension,
+      package: cleanItem.package,
+      customEntry: cleanItem.customEntry,
+      vessel: cleanItem.vessel,
+      segment: cleanItem.segment,
+      ibase: cleanItem.ibase,
+      remark: cleanItem.remark,
+      customsStatus: cleanItem.customsStatus
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `inventory/${serialNo}`);
+  }
+}
+
 
