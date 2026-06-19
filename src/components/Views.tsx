@@ -42,6 +42,7 @@ import { exportItemsToExcel, exportLogsToExcel, generateItemsTSV } from '../lib/
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { HoldToConfirmButton } from './HoldToConfirmButton';
+import { auth } from '../lib/firebase';
 
 export function InventoryList() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -1896,9 +1897,10 @@ export function TransactionHistory() {
         
         <div className="flex items-center gap-2 border-2 border-slate-900 bg-white p-1 neo-brutalism-shadow">
           <button 
+            type="button"
             onClick={() => setViewMode('grid')}
             className={cn(
-              "px-3 py-1.5 text-[9px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors",
+              "px-3 py-1.5 text-[9px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer",
               viewMode === 'grid' ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100"
             )}
           >
@@ -1906,9 +1908,10 @@ export function TransactionHistory() {
             <span>กรอบเล็ก</span>
           </button>
           <button 
+            type="button"
             onClick={() => setViewMode('list')}
             className={cn(
-              "px-3 py-1.5 text-[9px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors",
+              "px-3 py-1.5 text-[9px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer",
               viewMode === 'list' ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100"
             )}
           >
@@ -2037,7 +2040,7 @@ export function TransactionHistory() {
           )}
         </div>
       ) : (
-        /* Small boxes (กรอบเล็กๆ) Grid View for logs */
+        /* Small boxes Grid View for logs */
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredLogs.length === 0 ? (
             <div className="col-span-full p-16 text-center border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center gap-2 justify-center opacity-40 w-full">
@@ -2070,7 +2073,7 @@ export function TransactionHistory() {
                       </div>
 
                       <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 border-2 font-black text-[8px] uppercase tracking-tighter ${
-                        log.transactionType === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-600'
+                        log.transactionType === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-650'
                       }`}>
                         {log.transactionType}
                       </span>
@@ -2126,6 +2129,7 @@ export function Dashboard() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<TransactionLog | null>(null);
+  const [showOnlyMine, setShowOnlyMine] = useState(false);
 
   useEffect(() => {
     const unsub1 = subscribeToInventory(setItems);
@@ -2133,94 +2137,421 @@ export function Dashboard() {
     return () => { unsub1(); unsub2(); };
   }, []);
 
-  const totalIn = items.filter(i => i.status === 'IN').length;
-  const totalOut = items.filter(i => i.status === 'OUT').length;
+  const currentUserId = auth.currentUser?.uid;
+
+  // Filter items and logs if 'Show Mine Only' toggle is enabled
+  const filteredItems = showOnlyMine && currentUserId
+    ? items.filter(i => i.userId === currentUserId)
+    : items;
+
+  const filteredLogs = showOnlyMine && currentUserId
+    ? logs.filter(l => l.userId === currentUserId)
+    : logs;
+
+  const totalIn = filteredItems.filter(i => i.status === 'IN').length;
+  const totalOut = filteredItems.filter(i => i.status === 'OUT').length;
   
   const stats = [
-    { label: 'Master Assets', value: items.length, icon: Package },
-    { label: 'Base Stock', value: totalIn, icon: ArrowDownLeft, color: 'text-emerald-600' },
-    { label: 'Deployed', value: totalOut, icon: ArrowUpRight, color: 'text-red-600' },
-    { label: 'Recent Cycles', value: logs.length, icon: Activity, trend: 'ONLINE' },
+    { 
+      label: 'MASTER ASSETS', 
+      value: filteredItems.length, 
+      icon: Package,
+      waveColor: '#3b82f6',
+      wavePath: 'M 0 32 Q 25 15, 50 25 T 100 12 T 150 28 T 200 8 T 250 25 L 250 40 L 0 40 Z'
+    },
+    { 
+      label: 'BASE STOCK', 
+      value: totalIn, 
+      icon: ArrowDownLeft, 
+      color: 'text-emerald-600',
+      waveColor: '#10b981',
+      wavePath: 'M 0 28 Q 20 35, 40 18 T 80 32 T 120 15 T 160 26 T 200 12 T 250 30 L 250 40 L 0 40 Z'
+    },
+    { 
+      label: 'DEPLOYED', 
+      value: totalOut, 
+      icon: ArrowUpRight, 
+      color: 'text-red-600',
+      waveColor: '#ef4444',
+      wavePath: 'M 0 35 Q 30 35, 60 30 T 120 22 T 180 12 T 220 8 T 250 5 L 250 40 L 0 40 Z'
+    },
+    { 
+      label: 'RECENT CYCLES', 
+      value: filteredLogs.length, 
+      icon: Activity, 
+      trend: 'ONLINE',
+      waveColor: '#6366f1',
+      wavePath: 'M 0 20 Q 15 8, 30 25 T 60 12 T 90 32 T 120 18 T 150 26 T 180 8 T 210 28 T 250 15 L 250 40 L 0 40 Z'
+    },
   ];
 
+  // Helper to format date in fine style matching screenshot (e.g. "MAY, 2:22:20 PM" or "JUN 18, 10:46:26 PM")
+  const formatLogDate = (dateObj: any) => {
+    if (!dateObj) return 'N/A';
+    try {
+      const d = typeof dateObj.toDate === 'function' ? dateObj.toDate() : new Date(dateObj);
+      const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+      const monthStr = months[d.getMonth()];
+      const day = d.getDate();
+      
+      const timeStr = d.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit', 
+        hour12: true 
+      });
+      return `${monthStr} ${day}, ${timeStr}`;
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
+  // Group items by Part Number from the complete list to compute accurate stock alerts
+  const baseStockMapping: { [part: string]: { partNo: string; desc: string; count: number } } = {};
+  filteredItems.forEach(i => {
+    if (i.partNo) {
+      if (!baseStockMapping[i.partNo]) {
+        baseStockMapping[i.partNo] = { partNo: i.partNo, desc: i.description || 'N/A', count: 0 };
+      }
+      if (i.status === 'IN') {
+        baseStockMapping[i.partNo].count++;
+      }
+    }
+  });
+
+  const lowStockParts = Object.values(baseStockMapping)
+    .filter(p => p.count > 0 && p.count <= 10)
+    .sort((a,b) => a.count - b.count)
+    .slice(0, 3);
+
+  // Math for donut chart (At Base vs Deployed)
+  const totalCount = totalIn + totalOut;
+  const pctIn = totalCount > 0 ? (totalIn / totalCount) * 100 : 0;
+  const pctOut = totalCount > 0 ? (totalOut / totalCount) * 100 : 0;
+
   return (
-    <div className="space-y-12">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+    <div className="space-y-8 animate-fade-in">
+      
+      {/* Upper sub-header toolbar exact image layout */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b-2 border-slate-200">
+        <div>
+          <span className="text-[10px] font-black tracking-widest text-[#3b82f6] uppercase">SYNCHRONIZED LEDGER</span>
+          <h3 className="text-lg font-black font-sans text-slate-900 tracking-tight uppercase flex items-center gap-2">
+            <span className="w-1.5 h-4 bg-[#3b82f6] inline-block"></span>
+            Asset Management Workspace
+          </h3>
+        </div>
+        
+        {/* Toggle Switch design matching image */}
+        <div className="flex items-center gap-3 bg-white px-3 py-1.5 border-2 border-slate-900 rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
+          <span className="text-[11px] font-black uppercase text-slate-700 font-mono tracking-tight">แสดงเฉพาะของฉัน</span>
+          <button 
+            type="button"
+            onClick={() => setShowOnlyMine(!showOnlyMine)}
+            className={cn(
+              "w-10 h-6 flex items-center p-0.5 transition-all duration-300 rounded-full border border-slate-900 select-none cursor-pointer",
+              showOnlyMine ? "bg-blue-600 justify-end" : "bg-slate-200 justify-start"
+            )}
+          >
+            <span className="w-4.5 h-4.5 bg-white rounded-full shadow border border-slate-900"></span>
+          </button>
+        </div>
+      </div>
+
+      {/* 4 Metric cards in a row with wave graphics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
         {stats.map((stat, idx) => (
-          <div key={idx} className="bg-white border-4 border-slate-900 p-8 neo-brutalism-shadow group">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 border-2 border-slate-900 bg-slate-50 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                <stat.icon className="w-4 h-4" />
+          <div 
+            key={idx} 
+            className="bg-white border-2 border-slate-900 flex flex-col justify-between p-6 rounded-none shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] hover:translate-y-[-2px] hover:translate-x-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(11,22,44,1)] transition-all duration-200 group relative overflow-hidden min-h-40"
+          >
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-1.5 border border-slate-950 bg-slate-50 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-200 shrink-0">
+                  <stat.icon className="w-3.5 h-3.5 text-slate-900 group-hover:text-white" />
+                </div>
+                <span className="text-[9px] uppercase font-black tracking-wider text-slate-500 font-sans">{stat.label}</span>
               </div>
-              <span className="text-[10px] uppercase font-black tracking-[0.2em] opacity-40">{stat.label}</span>
+              <div className="z-10 relative">
+                <span className="text-4xl font-black font-mono tracking-tighter text-slate-900">{stat.value}</span>
+              </div>
             </div>
-            <div className="flex items-end justify-between">
-              <span className="text-5xl font-black font-mono tracking-tighter italic">{stat.value}</span>
-              {stat.trend && (
-                <span className="text-[9px] uppercase font-black p-1 border-2 border-slate-900 bg-emerald-50 text-emerald-600">{stat.trend}</span>
-              )}
+            
+            {/* Smooth trendline graphics exactly like the image mockup bottom waves */}
+            <div className="absolute inset-x-0 bottom-0 h-10 w-full opacity-60 pointer-events-none">
+              <svg width="100%" height="100%" viewBox="0 0 250 40" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id={`grad-${idx}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor={stat.waveColor} stopOpacity="0.4" />
+                    <stop offset="100%" stopColor={stat.waveColor} stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+                <path d={stat.wavePath} fill={`url(#grad-${idx})`} stroke={stat.waveColor} strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
             </div>
+
+            {stat.trend && (
+              <span className="absolute top-4 right-4 text-[7.5px] font-mono font-black border border-emerald-500 bg-emerald-50 text-emerald-700 px-1 py-0.5 leading-none">
+                {stat.trend}
+              </span>
+            )}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-        <div className="lg:col-span-8 space-y-6">
-          <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
-            <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-3">
-              <span className="w-2 h-2 bg-slate-900"></span>
-              Synchronous Activity Stream
+      {/* Main split grid: Left Asset Management Table, Right Side Dashboard Panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Left Column: Asset Management Hub TABLE */}
+        <div className="lg:col-span-8 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-300 pb-2">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 flex items-center gap-2">
+              <span className="w-2 h-2 bg-slate-950 inline-block"></span>
+              ASSET MANAGEMENT HUB
             </h3>
-            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 bg-slate-100 px-2 py-1 border border-slate-200">
-              คลิกเพื่อดูรายละเอียดรอบงาน (Click to Inspect)
+            <span className="text-[8.5px] font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 border border-slate-200">
+              คลิกที่แถวรายการเพื่อสืบรายละเอียด (Row items searchable)
             </span>
           </div>
-          <div className="space-y-4">
-            {logs.slice(0, 5).map((log, idx) => (
-              <div 
-                key={idx} 
-                onClick={() => setSelectedLog(log)}
-                className="bg-white border-2 border-slate-900 p-6 flex items-center justify-between hover:bg-slate-50 hover:translate-y-[-2px] hover:translate-x-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] transition-all cursor-pointer group rounded-none"
-              >
-                <div className="flex items-center gap-8">
-                  <div className={cn(
-                    "w-12 h-12 border-2 border-slate-900 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105",
-                    log.transactionType === 'IN' ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
-                  )}>
-                    {log.transactionType === 'IN' ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-black uppercase tracking-tighter italic overflow-hidden">Asset_#{log.serialNo} routed to {log.destination}</p>
-                    <p className="text-[9px] uppercase opacity-40 font-black mt-1 font-mono">Invoice: {log.invoiceNo} • ADDR: {log.date?.toDate().toLocaleTimeString()}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                   <p className="text-[10px] font-mono font-black italic opacity-40 uppercase tracking-widest">{log.transactionType}</p>
-                </div>
-              </div>
-            ))}
+
+          <div className="bg-white border-2 border-slate-900 overflow-hidden shadow-[4px_4px_0px_0px_rgba(15,23,42,1)]">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="bg-slate-50 border-b-2 border-slate-900 text-[8.5px] font-sans font-black text-slate-700 uppercase divide-x divide-slate-200">
+                    <th className="px-3 py-2.5 font-bold tracking-tight">CHECK-IN/OUT TIMESTAMP</th>
+                    <th className="px-3 py-2.5 font-bold tracking-tight">ACTIVITY TYPE</th>
+                    <th className="px-3 py-2.5 font-bold tracking-tight">ASSET ID</th>
+                    <th className="px-3 py-2.5 font-bold tracking-tight">STATUS</th>
+                    <th className="px-3 py-2.5 font-bold tracking-tight">INVOICE REF</th>
+                    <th className="px-3 py-2.5 font-bold tracking-tight text-right">QUANTITY</th>
+                    <th className="px-3 py-2.5 font-bold tracking-tight">HANDLED BY</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 font-mono text-[10px] text-slate-800">
+                  {filteredLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-10 text-xs font-bold font-sans text-slate-400 uppercase italic">
+                        ไม่พบประวัติรายการเคลื่อนไหว (No synchronous transaction records)
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLogs.slice(0, 10).map((log, idx) => {
+                      const isItemIn = log.transactionType === 'IN';
+                      const dispQty = isItemIn ? (log.qty || 1) : -Math.abs(log.qty || 1);
+                      const handledByEmail = log.userId ? log.userId.slice(0, 5).toUpperCase() : 'STAFF';
+
+                      // Format specific status tags matching screenshot
+                      let statusBadge = (
+                        <span className="px-2 py-0.5 border text-[8.5px] font-extrabold leading-none tracking-tight uppercase border-emerald-500 bg-emerald-50 text-emerald-800">
+                          IN-STOCK
+                        </span>
+                      );
+                      if (!isItemIn) {
+                        statusBadge = (
+                          <span className="px-2 py-0.5 border text-[8.5px] font-extrabold leading-none tracking-tight uppercase border-rose-500 bg-rose-50 text-rose-800">
+                            OUT-OF-STOCK
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <tr 
+                          key={idx} 
+                          onClick={() => setSelectedLog(log)}
+                          className="hover:bg-blue-50/40 divide-x divide-slate-200 cursor-pointer transition-colors"
+                        >
+                          <td className="px-3 py-2.5 font-bold text-slate-500 whitespace-nowrap">
+                            {formatLogDate(log.date)}
+                          </td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              {isItemIn ? (
+                                <div className="p-1 border border-emerald-300 bg-emerald-50 text-emerald-600 shrink-0">
+                                  <ArrowDownLeft className="w-3 h-3" />
+                                </div>
+                              ) : (
+                                <div className="p-1 border border-rose-300 bg-rose-50 text-rose-600 shrink-0">
+                                  <ArrowUpRight className="w-3 h-3" />
+                                </div>
+                              )}
+                              <span className="font-black text-slate-900 uppercase font-sans tracking-tight text-[9.5px]">
+                                {isItemIn ? 'STOCK RECEIVED' : 'ASSET DEPLOYED'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 font-bold text-slate-950 font-mono break-all whitespace-nowrap max-w-[120px] truncate" title={log.serialNo}>
+                            {getDisplaySerial(log.serialNo)}
+                          </td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            {statusBadge}
+                          </td>
+                          <td className="px-3 py-2.5 font-semibold text-slate-600 truncate max-w-[100px] whitespace-nowrap" title={log.invoiceNo}>
+                            {log.invoiceNo || 'MANUAL-ADD'}
+                          </td>
+                          <td className={cn(
+                            "px-3 py-2.5 text-right font-black",
+                            dispQty < 0 ? 'text-rose-600' : 'text-slate-900'
+                          )}>
+                            {dispQty}
+                          </td>
+                          <td className="px-3 py-2.5 font-semibold text-slate-500 whitespace-nowrap">
+                            Staff ({handledByEmail})
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
+        {/* Right Sidebar layout */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="bg-slate-900 text-white p-10 border-4 border-slate-900 neo-brutalism-shadow relative overflow-hidden h-full">
-            <div className="relative z-10 space-y-8">
-              <div className="flex items-center gap-3">
-                <Activity className="w-6 h-6 text-emerald-400" />
-                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-white/40">Core Status</h4>
+          
+          {/* Card 1: CORE STATUS Panel */}
+          <div className="bg-[#0c1527] text-white p-6 border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] relative overflow-hidden min-h-[160px] flex flex-col justify-between">
+            <div className="relative z-10 space-y-4">
+              <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-emerald-400 animate-pulse shrink-0" />
+                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-300/80">CORE STATUS</h4>
               </div>
-              <h4 className="text-2xl font-black leading-tight uppercase italic scale-y-110 origin-left">
-                All systems <br/>Stabilized. <br/>Flow optimized.
+              <h4 className="text-xl font-bold leading-tight uppercase tracking-tight scale-y-105 origin-left text-white font-sans">
+                ALL SYSTEMS STABILIZED.<br/>FLOW OPTIMIZED.
               </h4>
-              <div className="w-full h-1 bg-white/10" />
-              <p className="text-[10px] opacity-60 leading-relaxed uppercase font-black tracking-widest">
-                Distributed ledger sync complete. <br/>
-                Wait_State: Idle.
+            </div>
+            
+            <div className="relative z-10">
+              <div className="w-full h-px bg-slate-800 my-3" />
+              <p className="text-[9px] opacity-60 uppercase font-mono leading-relaxed">
+                DISTRIBUTED LEDGER SYNC COMPLETE.<br/>
+                WAIT_STATS: <span className="text-emerald-400 font-bold">IDLE</span>.
               </p>
             </div>
-            <Package className="absolute -right-20 -bottom-20 w-80 h-80 opacity-5 -rotate-12" />
+            <Package className="absolute -right-16 -bottom-16 w-52 h-52 opacity-[0.03] -rotate-12 pointer-events-none" />
           </div>
+
+          {/* Card 2: INVENTORY COMPOSITION (Donut Chart with exact state values) */}
+          <div className="bg-white border-2 border-slate-900 p-5 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] space-y-4">
+            <div className="border-b border-slate-200 pb-1.5 flex items-center justify-between">
+              <h4 className="text-[10.5px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-blue-600 inline-block rounded-full"></span>
+                INVENTORY COMPOSITION
+              </h4>
+              <span className="text-[7.5px] font-mono font-black text-slate-400">{totalCount} UNITS</span>
+            </div>
+
+            {/* Custom SVG Donut rendering counts exact to base vs deployed */}
+            <div className="py-2 flex flex-col items-center justify-center relative">
+              <svg width="130" height="130" viewBox="0 0 130 130" className="mx-auto select-none">
+                <circle cx="65" cy="65" r="46" fill="transparent" stroke="#f1f5f9" strokeWidth="11" />
+                {totalCount > 0 ? (
+                  <>
+                    {/* At Base portion */}
+                    <circle
+                      cx="65"
+                      cy="65"
+                      r="46"
+                      fill="transparent"
+                      stroke="#3b82f6"
+                      strokeWidth="11"
+                      strokeDasharray={`${2 * Math.PI * 46}`}
+                      strokeDashoffset={`${2 * Math.PI * 46 * (1 - pctIn / 100)}`}
+                      strokeLinecap="round"
+                      transform="rotate(-90 65 65)"
+                      className="transition-all duration-700 ease-out"
+                    />
+                    {/* Deployed portion */}
+                    {pctOut > 0 && (
+                      <circle
+                        cx="65"
+                        cy="65"
+                        r="46"
+                        fill="transparent"
+                        stroke="#94a3b8"
+                        strokeWidth="11"
+                        strokeDasharray={`${2 * Math.PI * 46}`}
+                        strokeDashoffset={`${2 * Math.PI * 46 * (1 - pctOut / 100)}`}
+                        strokeLinecap="round"
+                        transform={`rotate(${(pctIn * 3.6) - 90} 65 65)`}
+                        className="transition-all duration-700 ease-out"
+                      />
+                    )}
+                  </>
+                ) : (
+                  <circle cx="65" cy="65" r="46" fill="transparent" stroke="#e2e8f0" strokeWidth="11" />
+                )}
+                {/* Center label */}
+                <text x="65" y="63" textAnchor="middle" className="text-xl font-black font-sans fill-slate-900">
+                  {totalCount}
+                </text>
+                <text x="65" y="78" textAnchor="middle" className="text-[8.5px] font-black text-slate-400 font-mono tracking-widest uppercase">
+                  UNITS
+                </text>
+              </svg>
+
+              {/* Legends matching image design */}
+              <div className="w-full mt-4 space-y-2 text-[10px] font-bold text-slate-700 border-t border-slate-100 pt-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-[#3b82f6] inline-block shrink-0 border border-slate-900"></span>
+                    <span>อยู่ในเบส (At Base)</span>
+                  </div>
+                  <span className="font-mono text-[11px] font-black">{totalIn} ({pctIn.toFixed(0)}%)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-[#94a3b8] inline-block shrink-0 border border-slate-900"></span>
+                    <span>นอกเบส (Deployed)</span>
+                  </div>
+                  <span className="font-mono text-[11px] font-black text-slate-500">{totalOut} ({pctOut.toFixed(0)}%)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: STOCK LEVEL ALERTS */}
+          <div className="bg-white border-2 border-slate-900 p-5 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] space-y-3">
+            <div className="border-b border-slate-200 pb-1.5">
+              <h4 className="text-[10.5px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-[#ef4444] inline-block rounded-full"></span>
+                STOCK LEVEL ALERTS
+              </h4>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              {lowStockParts.length === 0 ? (
+                <div className="p-4 bg-emerald-50 border border-emerald-300 text-[9.5px] font-bold text-emerald-800 uppercase text-center rounded-none font-sans">
+                  ✔ ทุกชิ้นส่วนมีสินค้าพอใช้งาน (Critical stock okay)
+                </div>
+              ) : (
+                lowStockParts.map((part, index) => (
+                  <div key={index} className="p-3 bg-amber-50/70 border border-slate-400 flex flex-col gap-1.5 rounded-none">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono font-black text-[10px] text-slate-900 uppercase">
+                        {part.partNo}
+                      </span>
+                      <span className="text-[8px] font-black font-sans uppercase bg-amber-500 text-white px-1.5 py-0.5 border border-slate-950 leading-none">
+                        NEED RE-ORDER
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-bold text-slate-500 line-clamp-1 uppercase">
+                      {part.desc}
+                    </span>
+                    <div className="flex justify-between items-center text-[8.5px] font-mono font-bold text-amber-800 uppercase border-t border-slate-200/50 pt-1 mt-0.5">
+                      <span>STOCK AT BASE:</span>
+                      <span className="font-black text-[10.5px]">{part.count} UNITS</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
         </div>
+
       </div>
 
       {/* Pop-up modal details for selected log, showing associated/co-processed invoice batch records */}
