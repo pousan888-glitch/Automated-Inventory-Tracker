@@ -24,7 +24,10 @@ import {
   Check,
   Upload,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  RefreshCw,
+  Plus,
+  Minus
 } from 'lucide-react';
 import { 
   subscribeToInventory, 
@@ -35,7 +38,8 @@ import {
   updateInventoryItem,
   importMasterInventory,
   addManualInventoryItem,
-  getDisplaySerial
+  getDisplaySerial,
+  processPartialInOut
 } from '../lib/inventoryService';
 import * as XLSX from 'xlsx';
 import { exportItemsToExcel, exportLogsToExcel, generateItemsTSV } from '../lib/exportUtils';
@@ -93,6 +97,51 @@ export function InventoryList() {
 
   const [autofillFeedback, setAutofillFeedback] = useState<string | null>(null);
   const [activeSuggestionField, setActiveSuggestionField] = useState<'serial' | 'part' | 'desc' | null>(null);
+
+  // IN/OUT Stock Deduction Modal States
+  const [inOutItem, setInOutItem] = useState<InventoryItem | null>(null);
+  const [inOutType, setInOutType] = useState<'IN' | 'OUT'>('OUT');
+  const [inOutQty, setInOutQty] = useState<number>(1);
+  const [inOutDestination, setInOutDestination] = useState<string>('ต่างประเทศ/เบิกใช้งาน');
+  const [inOutInvoice, setInOutInvoice] = useState<string>('');
+  const [inOutRemark, setInOutRemark] = useState<string>('');
+  const [isInOutProcessing, setIsInOutProcessing] = useState<boolean>(false);
+
+  const handleOpenInOutModal = (item: InventoryItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setInOutItem(item);
+    setInOutType(item.status === 'IN' ? 'OUT' : 'IN');
+    setInOutQty(1);
+    setInOutDestination(item.status === 'IN' ? 'ต่างประเทศ/เบิกใช้งาน' : 'In-Base');
+    setInOutInvoice('');
+    setInOutRemark('');
+  };
+
+  const handleConfirmInOut = async () => {
+    if (!inOutItem) return;
+    setIsInOutProcessing(true);
+    try {
+      await processPartialInOut({
+        item: inOutItem,
+        transactionType: inOutType,
+        qtyToProcess: inOutQty,
+        destinationLocation: inOutDestination,
+        invoiceNo: inOutInvoice,
+        remark: inOutRemark
+      });
+      const msg = inOutType === 'OUT'
+        ? `ทำรายการตัดสต็อกเบิกออกจำนวน ${inOutQty} ${inOutItem.uom || 'EA'} สำเร็จแล้ว!`
+        : `ทำรายการรับเข้าเพิ่มจำนวน ${inOutQty} ${inOutItem.uom || 'EA'} เรียบร้อยแล้ว!`;
+      setCopyNotification(msg);
+      setTimeout(() => setCopyNotification(null), 5000);
+      setInOutItem(null);
+    } catch (err: any) {
+      console.error("Error processing in/out:", err);
+      alert('เกิดข้อผิดพลาด: ' + (err.message || 'ไม่สามารถตัดสต็อกได้'));
+    } finally {
+      setIsInOutProcessing(false);
+    }
+  };
 
   // Helper to get suggestions based on user input
   const getSerialSuggestions = (val: string) => {
@@ -576,12 +625,13 @@ export function InventoryList() {
                   <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200">Description</th>
                   <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200 text-center">QTY</th>
                   <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200 text-center">Status / Location</th>
+                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200 text-center">จัดการสต็อก (IN-OUT)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-24 text-center">
+                    <td colSpan={9} className="p-24 text-center">
                       <div className="flex flex-col items-center gap-2 opacity-20">
                         <Package className="w-16 h-16" />
                         <p className="text-sm uppercase font-black tracking-widest">Data_Buffer_Empty</p>
@@ -620,7 +670,7 @@ export function InventoryList() {
                       <React.Fragment key={groupName}>
                         {/* Group Header Row */}
                         <tr className={cn("border-y-2 border-slate-900/10 font-bold", colorScheme.bg)}>
-                          <td colSpan={8} className="px-4 py-2.5 align-middle select-none">
+                          <td colSpan={9} className="px-4 py-2.5 align-middle select-none">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <span className={cn("px-2.5 py-1 text-[11px] font-black uppercase tracking-widest border-2 border-slate-900", colorScheme.tag)}>
@@ -694,7 +744,9 @@ export function InventoryList() {
 
                               {/* QTY */}
                               <td className="px-4 py-3 text-center text-xs font-mono font-bold text-slate-800">
-                                {item.qty !== undefined ? item.qty : 1}
+                                <span className="bg-amber-100 text-amber-950 px-2 py-0.5 border border-amber-300 font-black">
+                                  {item.qty !== undefined ? item.qty : 1} {item.uom || 'EA'}
+                                </span>
                               </td>
 
                               {/* Status / Location */}
@@ -723,6 +775,19 @@ export function InventoryList() {
                                     </span>
                                   )}
                                 </div>
+                              </td>
+
+                              {/* IN/OUT Action */}
+                              <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleOpenInOutModal(item, e)}
+                                  className="px-2.5 py-1 bg-amber-400 hover:bg-amber-500 text-slate-950 border-2 border-slate-900 text-[9.5px] font-black uppercase tracking-tight inline-flex items-center gap-1 shadow-[1.5px_1.5px_0px_0px_rgba(15,23,42,1)] cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                                  title="ตัดสต็อกเบิกออก / คืนเข้าคลัง"
+                                >
+                                  <RefreshCw className="w-3 h-3 text-slate-950" />
+                                  <span>เบิก/คืน (IN-OUT)</span>
+                                </button>
                               </td>
                             </tr>
                           );
@@ -799,6 +864,22 @@ export function InventoryList() {
                           <p className="text-[9.5px] font-bold tracking-tight uppercase line-clamp-2 leading-tight text-slate-800" title={item.description}>
                             {item.description}
                           </p>
+                        </div>
+
+                        {/* QTY & Action Button */}
+                        <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-[9.5px] font-mono font-black text-slate-900 bg-amber-100 px-1.5 py-0.5 border border-amber-300">
+                            QTY: {item.qty !== undefined ? item.qty : 1} {item.uom || 'EA'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleOpenInOutModal(item, e)}
+                            className="px-2 py-1 bg-amber-400 hover:bg-amber-500 text-slate-950 border-2 border-slate-900 font-sans text-[8.5px] font-black uppercase tracking-tight flex items-center gap-1 shadow-[1.5px_1.5px_0px_0px_rgba(15,23,42,1)] cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                            title="ตัดสต็อกเบิกออก / คืนเข้าคลัง"
+                          >
+                            <RefreshCw className="w-3 h-3 text-slate-950" />
+                            <span>เบิก/คืน</span>
+                          </button>
                         </div>
                       </div>
 
@@ -930,20 +1011,34 @@ export function InventoryList() {
             </button>
 
             {/* Modal Heading Header */}
-            <div className="bg-slate-900 text-white p-6 pr-16 shrink-0">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className="text-[9px] uppercase font-black bg-blue-600 text-white px-2 py-0.5 border border-blue-400 font-mono tracking-widest">
-                  แผงควบคุมหลักฝ่ายแอดมิน (CIPL PROFILE WORKSPACE)
-                </span>
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 border border-white font-black text-[9px] uppercase ${
-                  tempItem.status === 'IN' ? 'bg-emerald-600' : 'bg-red-600'
-                }`}>
-                  {tempItem.status}
-                </span>
+            <div className="bg-slate-900 text-white p-6 pr-16 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <span className="text-[9px] uppercase font-black bg-blue-600 text-white px-2 py-0.5 border border-blue-400 font-mono tracking-widest">
+                    แผงควบคุมหลักฝ่ายแอดมิน (CIPL PROFILE WORKSPACE)
+                  </span>
+                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 border border-white font-black text-[9px] uppercase ${
+                    tempItem.status === 'IN' ? 'bg-emerald-600' : 'bg-red-600'
+                  }`}>
+                    {tempItem.status}
+                  </span>
+                  <span className="bg-amber-300 text-amber-950 text-[9px] font-mono font-black px-2 py-0.5 border border-amber-400">
+                    คงเหลือ: {tempItem.qty !== undefined ? tempItem.qty : 1} {tempItem.uom || 'EA'}
+                  </span>
+                </div>
+                <h3 className="text-xl md:text-2xl font-black font-mono tracking-tighter uppercase break-all">
+                  {getDisplaySerial(tempItem.serialNo)}
+                </h3>
               </div>
-              <h3 className="text-xl md:text-2xl font-black font-mono tracking-tighter uppercase break-all">
-                {getDisplaySerial(tempItem.serialNo)}
-              </h3>
+
+              <button
+                type="button"
+                onClick={(e) => handleOpenInOutModal(tempItem, e)}
+                className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-slate-950 border-2 border-slate-900 font-sans text-[10.5px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] cursor-pointer active:translate-x-0.5 active:translate-y-0.5 shrink-0"
+              >
+                <RefreshCw className="w-4 h-4 text-slate-950" />
+                <span>ตัดสต็อก / เบิกออก-คืนเข้า (IN-OUT)</span>
+              </button>
             </div>
 
             {/* Navigation Tab Heads */}
@@ -1850,6 +1945,268 @@ export function InventoryList() {
                   <span>{isManualSaving ? 'กำลังจัดเก็บสินค้า...' : 'บันทึกเพิ่มสินค้า (Save Item)'}</span>
                 </button>
               </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* 🚚 Pop-up IN/OUT Stock Deduction Modal Panel */}
+      {inOutItem && (
+        <div 
+          className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto select-none"
+          onClick={() => { if (!isInOutProcessing) setInOutItem(null); }}
+        >
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white border-4 border-slate-900 w-full max-w-lg neo-brutalism-shadow relative my-8 flex flex-col overflow-hidden rounded-none shadow-[8px_8px_0px_0px_rgba(15,23,42,1)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Close Button */}
+            <button 
+              onClick={() => { if (!isInOutProcessing) setInOutItem(null); }}
+              className="absolute top-4 right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1.5 transition-colors z-10 cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+              disabled={isInOutProcessing}
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="bg-slate-900 text-white p-5 pr-14">
+              <span className="text-[8.5px] font-black uppercase bg-amber-400 text-slate-950 px-2 py-0.5 border border-amber-300 font-mono tracking-widest">
+                ระบบจัดการตัดสต็อกเบิกสินค้า (IN / OUT STOCK CUTTING WORKSPACE)
+              </span>
+              <h3 className="text-lg md:text-xl font-black font-sans tracking-tight uppercase mt-1 flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-amber-400" />
+                <span>ทำรายการเบิกออก / คืนเข้าสต็อก</span>
+              </h3>
+            </div>
+
+            {/* Item Summary Box */}
+            <div className="p-5 bg-slate-50 border-b-2 border-slate-900 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-mono font-black text-blue-600 bg-blue-50 px-2 py-0.5 border border-blue-200">
+                  S/N: {getDisplaySerial(inOutItem.serialNo)}
+                </span>
+                <span className={cn(
+                  "text-[9px] font-black uppercase px-2 py-0.5 border-2",
+                  inOutItem.status === 'IN' ? "bg-emerald-100 text-emerald-800 border-emerald-600" : "bg-red-100 text-red-800 border-red-600"
+                )}>
+                  สถานะปัจจุบัน: {inOutItem.status} ({inOutItem.currentLocation || 'In-Base'})
+                </span>
+              </div>
+              <p className="text-xs font-black text-slate-900 uppercase font-sans line-clamp-2">
+                {inOutItem.description}
+              </p>
+              <div className="flex justify-between items-center text-[10px] font-mono font-bold text-slate-600 pt-2 border-t border-slate-200">
+                <span>PART REF: {inOutItem.partNo || 'N/A'}</span>
+                <span className="text-slate-950 font-black text-xs bg-amber-200 px-2 py-0.5 border border-amber-400">
+                  จำนวนที่มีในระบบ: {inOutItem.qty !== undefined ? inOutItem.qty : 1} {inOutItem.uom || 'EA'}
+                </span>
+              </div>
+            </div>
+
+            {/* Main Action Form */}
+            <div className="p-5 space-y-5">
+              {/* Toggle IN / OUT */}
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 block mb-1.5 font-mono">
+                  ประเภทรายการ (TRANSACTION ACTION)
+                </label>
+                <div className="grid grid-cols-2 gap-3 h-[42px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInOutType('OUT');
+                      if (inOutDestination === 'In-Base') setInOutDestination('ต่างประเทศ/เบิกใช้งาน');
+                    }}
+                    className={cn(
+                      "border-2 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all",
+                      inOutType === 'OUT'
+                        ? "bg-red-600 border-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+                        : "bg-white border-slate-300 text-slate-600 hover:border-slate-800"
+                    )}
+                  >
+                    <ArrowUpRight className="w-4 h-4" />
+                    <span>🔴 เบิกออก (Check OUT)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInOutType('IN');
+                      setInOutDestination('In-Base');
+                    }}
+                    className={cn(
+                      "border-2 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all",
+                      inOutType === 'IN'
+                        ? "bg-emerald-600 border-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+                        : "bg-white border-slate-300 text-slate-600 hover:border-slate-800"
+                    )}
+                  >
+                    <ArrowDownLeft className="w-4 h-4" />
+                    <span>🟢 คืนเข้า (Check IN)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quantity to Process */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 font-mono">
+                    ระบุจำนวนที่ต้องการ{inOutType === 'OUT' ? 'เบิกออก' : 'รับเข้า'} (QTY TO {inOutType})
+                  </label>
+                  <span className="text-[10px] font-bold text-slate-500">
+                    มีในระบบ {inOutItem.qty || 1} {inOutItem.uom || 'EA'}
+                  </span>
+                </div>
+
+                <div className="flex gap-2 items-center">
+                  <button
+                    type="button"
+                    onClick={() => setInOutQty(prev => Math.max(1, prev - 1))}
+                    className="w-10 h-10 border-2 border-slate-900 bg-slate-100 hover:bg-slate-200 font-black text-lg flex items-center justify-center cursor-pointer shrink-0"
+                  >
+                    -
+                  </button>
+
+                  <input 
+                    type="number"
+                    min={1}
+                    max={inOutType === 'OUT' ? (inOutItem.qty || 1) : 99999}
+                    value={inOutQty}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 1;
+                      setInOutQty(Math.max(1, val));
+                    }}
+                    className="flex-1 h-10 border-2 border-slate-950 px-3 text-center font-mono text-base font-black bg-white focus:outline-none focus:border-blue-600"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setInOutQty(prev => prev + 1)}
+                    className="w-10 h-10 border-2 border-slate-900 bg-slate-100 hover:bg-slate-200 font-black text-lg flex items-center justify-center cursor-pointer shrink-0"
+                  >
+                    +
+                  </button>
+                </div>
+
+                {/* Preset Buttons */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[8.5px] font-black text-slate-400 uppercase font-mono">ปุ่มเลือกด่วน:</span>
+                  {[1, 2, 5, 10].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setInOutQty(n)}
+                      className="px-2.5 py-1 bg-white border border-slate-900 hover:bg-slate-100 font-mono text-[9px] font-black cursor-pointer shadow-[1px_1px_0px_0px_rgba(15,23,42,1)]"
+                    >
+                      {n}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setInOutQty(inOutItem.qty || 1)}
+                    className="px-2.5 py-1 bg-amber-300 border border-slate-900 hover:bg-amber-400 font-sans text-[9px] font-black cursor-pointer shadow-[1px_1px_0px_0px_rgba(15,23,42,1)] uppercase"
+                  >
+                    เบิกทั้งหมด ({inOutItem.qty || 1})
+                  </button>
+                </div>
+
+                {/* Dynamic Result Notice */}
+                <div className="p-3 bg-amber-50 border-2 border-amber-300 text-[11px] font-bold text-amber-950 space-y-1">
+                  {inOutType === 'OUT' ? (
+                    <p>
+                      ✂️ เบิกออก <span className="font-black text-red-600">{inOutQty}</span> {inOutItem.uom || 'EA'} ➔ สต็อกในคลังจะถูกตัดเหลือ <span className="font-black text-blue-700">{Math.max(0, (inOutItem.qty || 1) - inOutQty)}</span> {inOutItem.uom || 'EA'}
+                    </p>
+                  ) : (
+                    <p>
+                      📥 รับเข้าเพิ่ม <span className="font-black text-emerald-600">{inOutQty}</span> {inOutItem.uom || 'EA'} ➔ รวมสต็อกในคลังเป็น <span className="font-black text-blue-700">{(inOutItem.qty || 1) + inOutQty}</span> {inOutItem.uom || 'EA'}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Destination Location */}
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-wider text-slate-500 block font-mono">
+                  {inOutType === 'OUT' ? 'สถานที่ปลายทาง / แท่นเจาะ / ผู้เบิกไปใช้งาน (DESTINATION)' : 'สถานที่รับเข้าคลัง (LOCATION)'}
+                </label>
+                <input 
+                  type="text"
+                  value={inOutDestination}
+                  onChange={(e) => setInOutDestination(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-slate-900 bg-slate-50 font-sans text-xs font-bold uppercase focus:outline-none focus:border-blue-600"
+                  placeholder={inOutType === 'OUT' ? 'เช่น แท่นเจาะ Rig 4 / Songkhla Yard / Export' : 'In-Base'}
+                />
+                {/* Quick chips */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {['Songkhla Base', 'Rig 4', 'Free Zone', 'Export', 'Yard 2'].map(chip => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => setInOutDestination(chip)}
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 font-sans text-[8.5px] font-bold text-slate-700 cursor-pointer"
+                    >
+                      + {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ref / Invoice */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[8.5px] font-black uppercase text-slate-500 block font-mono">
+                    เลขที่เอกสาร / INVOICE REF
+                  </label>
+                  <input 
+                    type="text"
+                    value={inOutInvoice}
+                    onChange={(e) => setInOutInvoice(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border-2 border-slate-900 bg-slate-50 font-mono text-xs font-bold uppercase focus:outline-none focus:border-blue-600"
+                    placeholder={inOutType === 'OUT' ? 'OUT-2026-001' : 'IN-2026-001'}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[8.5px] font-black uppercase text-slate-500 block font-mono">
+                    หมายเหตุ / REMARKS
+                  </label>
+                  <input 
+                    type="text"
+                    value={inOutRemark}
+                    onChange={(e) => setInOutRemark(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border-2 border-slate-900 bg-slate-50 font-sans text-xs font-bold focus:outline-none focus:border-blue-600"
+                    placeholder="ระบุเหตุผลการเบิก"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Submit */}
+            <div className="p-4 bg-slate-900 border-t-2 border-slate-900 flex justify-between items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setInOutItem(null)}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-black text-[10px] uppercase cursor-pointer border border-slate-700"
+                disabled={isInOutProcessing}
+              >
+                ยกเลิก
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmInOut}
+                disabled={isInOutProcessing}
+                className={cn(
+                  "px-6 py-2.5 font-black text-xs uppercase tracking-wider border-2 border-slate-900 flex items-center gap-2 cursor-pointer shadow-[3px_3px_0px_0px_rgba(255,255,255,1)] active:translate-x-0.5 active:translate-y-0.5",
+                  inOutType === 'OUT' ? "bg-amber-400 hover:bg-amber-500 text-slate-950" : "bg-emerald-500 hover:bg-emerald-600 text-slate-950"
+                )}
+              >
+                <Check className="w-4 h-4 text-slate-950" />
+                <span>{isInOutProcessing ? 'กำลังตัดสต็อก...' : `ยืนยัน${inOutType === 'OUT' ? 'ตัดสต็อกเบิกออก' : 'รับเข้าสต็อก'} (${inOutQty} ${inOutItem.uom || 'EA'})`}</span>
+              </button>
             </div>
           </motion.div>
         </div>

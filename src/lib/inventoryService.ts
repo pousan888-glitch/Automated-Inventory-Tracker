@@ -487,6 +487,171 @@ export async function importFzInventoryReport(
   }
 }
 
+export async function processPartialInOut(params: {
+  item: InventoryItem;
+  transactionType: 'IN' | 'OUT';
+  qtyToProcess: number;
+  destinationLocation: string;
+  invoiceNo?: string;
+  remark?: string;
+}) {
+  const userId = auth.currentUser?.uid;
+  if (!userId) {
+    throw new Error('User must be authenticated to process inventory updates.');
+  }
+
+  const { item, transactionType, qtyToProcess, destinationLocation, invoiceNo, remark } = params;
+  const currentQty = item.qty !== undefined && item.qty > 0 ? Number(item.qty) : 1;
+  const processQty = Math.max(1, Math.min(qtyToProcess, transactionType === 'OUT' ? currentQty : 999999));
+
+  const docId = `${userId}_${item.serialNo.replace(/\//g, '_')}`;
+  const inventoryRef = doc(db, 'inventory', docId);
+  const logRef = collection(db, 'logs');
+
+  const cleanInvoiceNo = (invoiceNo || (transactionType === 'OUT' ? 'OUT-STOCK' : 'IN-STOCK')).trim();
+  const cleanDestination = (destinationLocation || (transactionType === 'OUT' ? 'ต่างประเทศ/เบิกใช้งาน' : 'In-Base')).trim();
+
+  try {
+    if (transactionType === 'OUT') {
+      if (processQty >= currentQty) {
+        // Entire stock goes OUT
+        await setDoc(inventoryRef, {
+          ...item,
+          userId,
+          qty: currentQty,
+          status: 'OUT',
+          currentLocation: cleanDestination,
+          lastUpdate: serverTimestamp(),
+          remark: remark ? (item.remark ? `${item.remark} | ${remark}` : remark) : (item.remark || '')
+        }, { merge: true });
+      } else {
+        // Partial OUT: Deduct from existing base item, create new record for OUT portion
+        const remainingQty = currentQty - processQty;
+        
+        // 1. Update remaining item at base
+        await setDoc(inventoryRef, {
+          ...item,
+          userId,
+          qty: remainingQty,
+          lastUpdate: serverTimestamp()
+        }, { merge: true });
+
+        // 2. Create a separate record for deployed/OUT portion
+        const outDocId = `${userId}_${item.serialNo.replace(/\//g, '_')}_OUT_${Date.now()}`;
+        const outInventoryRef = doc(db, 'inventory', outDocId);
+        await setDoc(outInventoryRef, {
+          ...item,
+          userId,
+          serialNo: item.serialNo,
+          qty: processQty,
+          status: 'OUT',
+          currentLocation: cleanDestination,
+          invoiceNo: cleanInvoiceNo,
+          lastUpdate: serverTimestamp(),
+          remark: remark || `เบิกออกจากซีเรียลหลัก (${currentQty} -> เหลือ ${remainingQty})`
+        }, { merge: true });
+      }
+
+      // Add transaction log
+      await addDoc(logRef, {
+        userId,
+        date: serverTimestamp(),
+        invoiceNo: cleanInvoiceNo,
+        transactionType: 'OUT',
+        serialNo: item.serialNo,
+        partNo: item.partNo || 'N/A',
+        description: item.description || '',
+        origin: item.currentLocation || 'In-Base',
+        destination: cleanDestination,
+        qty: processQty,
+        uom: item.uom || 'EA',
+        importEntryNo: item.importEntryNo || item.customEntry || '',
+        importEntryLineNo: item.importEntryLineNo || item.lineItem || '',
+        unitPrice: item.unitPrice || 0,
+        amount: (item.unitPrice || 0) * processQty,
+        remark: remark || `ตัดสต็อกเบิกออกจำนวน ${processQty} ${item.uom || 'EA'}`
+      });
+
+    } else {
+      // transactionType === 'IN'
+      if (item.status === 'OUT') {
+        if (processQty >= currentQty) {
+          // Entire OUT stock returns IN
+          await setDoc(inventoryRef, {
+            ...item,
+            userId,
+            qty: currentQty,
+            status: 'IN',
+            currentLocation: 'In-Base',
+            lastUpdate: serverTimestamp(),
+            remark: remark ? (item.remark ? `${item.remark} | ${remark}` : remark) : (item.remark || '')
+          }, { merge: true });
+        } else {
+          // Partial return IN
+          const remainingOutQty = currentQty - processQty;
+          
+          // Update OUT item
+          await setDoc(inventoryRef, {
+            ...item,
+            userId,
+            qty: remainingOutQty,
+            lastUpdate: serverTimestamp()
+          }, { merge: true });
+
+          // Also check or add IN stock
+          const inDocId = `${userId}_${item.serialNo.replace(/\//g, '_')}_IN_${Date.now()}`;
+          const inInventoryRef = doc(db, 'inventory', inDocId);
+          await setDoc(inInventoryRef, {
+            ...item,
+            userId,
+            serialNo: item.serialNo,
+            qty: processQty,
+            status: 'IN',
+            currentLocation: 'In-Base',
+            invoiceNo: cleanInvoiceNo,
+            lastUpdate: serverTimestamp(),
+            remark: remark || `คืนสต็อกเข้าคลังจำนวน ${processQty}`
+          }, { merge: true });
+        }
+      } else {
+        // Item is already IN, increase base stock qty
+        const newQty = currentQty + processQty;
+        await setDoc(inventoryRef, {
+          ...item,
+          userId,
+          qty: newQty,
+          status: 'IN',
+          currentLocation: 'In-Base',
+          lastUpdate: serverTimestamp(),
+          remark: remark ? (item.remark ? `${item.remark} | ${remark}` : remark) : (item.remark || '')
+        }, { merge: true });
+      }
+
+      // Add transaction log
+      await addDoc(logRef, {
+        userId,
+        date: serverTimestamp(),
+        invoiceNo: cleanInvoiceNo,
+        transactionType: 'IN',
+        serialNo: item.serialNo,
+        partNo: item.partNo || 'N/A',
+        description: item.description || '',
+        origin: item.currentLocation || 'External',
+        destination: 'In-Base',
+        qty: processQty,
+        uom: item.uom || 'EA',
+        importEntryNo: item.importEntryNo || item.customEntry || '',
+        importEntryLineNo: item.importEntryLineNo || item.lineItem || '',
+        unitPrice: item.unitPrice || 0,
+        amount: (item.unitPrice || 0) * processQty,
+        remark: remark || `รับสินค้าเข้าคลังจำนวน ${processQty} ${item.uom || 'EA'}`
+      });
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `inventory/${item.serialNo}`);
+  }
+}
+
 export async function addManualInventoryItem(item: Partial<InventoryItem>) {
   const userId = auth.currentUser?.uid;
   if (!userId) {
