@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Package, History, FileUp, LayoutDashboard, Settings } from 'lucide-react';
+import { LogOut, Package, History, FileUp, LayoutDashboard, Settings, Sparkles } from 'lucide-react';
 import { signOut } from '../lib/firebase';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -10,8 +10,8 @@ function cn(...inputs: ClassValue[]) {
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'inventory' | 'history' | 'upload' | 'settings';
-  setActiveTab: (tab: 'dashboard' | 'inventory' | 'history' | 'upload' | 'settings') => void;
+  activeTab: 'dashboard' | 'inventory' | 'history' | 'upload' | 'ai_chat' | 'settings';
+  setActiveTab: (tab: 'dashboard' | 'inventory' | 'history' | 'upload' | 'ai_chat' | 'settings') => void;
   user: any;
 }
 
@@ -21,6 +21,7 @@ export default function Layout({ children, activeTab, setActiveTab, user }: Layo
     { id: 'inventory', label: 'Inventory', icon: Package },
     { id: 'history', label: 'History', icon: History },
     { id: 'upload', label: 'Upload Invoice', icon: FileUp },
+    { id: 'ai_chat', label: 'AI Assistant', icon: Sparkles, badge: 'AI' },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -61,8 +62,13 @@ export default function Layout({ children, activeTab, setActiveTab, user }: Layo
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <tab.icon className="w-4 h-4" />
+                  <tab.icon className={cn("w-4 h-4", tab.id === 'ai_chat' && "text-amber-400")} />
                   <span className="text-xs uppercase">{tab.label}</span>
+                  {tab.id === 'ai_chat' && (
+                    <span className="text-[8px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.5 border border-slate-900 font-mono">
+                      GEMINI
+                    </span>
+                  )}
                 </div>
                 <span className="text-[10px] opacity-40 font-mono">0{idx + 1}</span>
               </button>
