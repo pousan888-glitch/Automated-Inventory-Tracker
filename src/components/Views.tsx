@@ -1260,7 +1260,7 @@ export function InventoryList() {
                   {/* Route planning and notes layout */}
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <div className="bg-white border-2 border-slate-900 p-4 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] md:col-span-4 space-y-2">
-                      <label className="text-[8.5px] text-slate-400 font-mono font-black uppercase">รหัสสาขาวิชา / เซ็กเมนต์ (SEGMENT / IBASE)</label>
+                      <label className="text-[8.5px] text-slate-400 font-mono font-black uppercase">แผนก (SEGMENT / IBASE)</label>
                       <div className="grid grid-cols-2 gap-2">
                         <input 
                           type="text" 
@@ -1758,7 +1758,7 @@ export function InventoryList() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">เซกเมนต์วิชาความรู้ (SEGMENT)</label>
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black uppercase">แผนก (SEGMENT)</label>
                     <input 
                       type="text" 
                       value={manualItem.segment || ''} 
@@ -1801,7 +1801,7 @@ export function InventoryList() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">จำนวนที่แอด (QTY OF ITEM)</label>
+                    <label className="text-[8.5px] text-slate-500 font-mono font-black block">จำนวน (QTY OF ITEM)</label>
                     <input 
                       type="number" 
                       value={manualItem.qty || 1} 
