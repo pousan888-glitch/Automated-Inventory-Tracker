@@ -1295,12 +1295,12 @@ export default function FileProcessor() {
                                   </span>
                                 ) : (
                                   <span className="inline-block bg-rose-50 text-rose-800 border border-rose-300 px-2 py-0.5 font-sans font-bold text-[10px]">
-                                    ✂️ คลังมี {matchQty} → ตัดหมดสต็อก (เปลี่ยนสถานะเป็น OUT)
+                                    ✂️ คลังมี {matchQty} → ตัดหมดสต็อก (นำออกจากหน้า Inventory ทันที)
                                   </span>
                                 )
                               ) : (
                                 <span className="inline-block bg-slate-100 text-slate-600 px-2 py-0.5 font-sans text-[10px]">
-                                  📦 บันทึกเป็นรายการส่งออก (OUT)
+                                  📦 บันทึกประวัติส่งออก (Transaction History)
                                 </span>
                               )
                             ) : (

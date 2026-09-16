@@ -269,7 +269,7 @@ export async function processInventoryUpdate(
           const currentQty = (match.qty !== undefined && Number(match.qty) > 0) ? Number(match.qty) : 1;
 
           if (processQty < currentQty) {
-            // ✂️ Partial deduction: Remaining stock stays in base (IN), deducted portion goes OUT
+            // ✂️ Partial deduction: Remaining stock stays in base (IN), deducted portion leaves inventory
             const remainingQty = currentQty - processQty;
 
             // 1. Update remaining item at base (status IN, reduced quantity)
@@ -286,99 +286,21 @@ export async function processInventoryUpdate(
             // Update in-memory copy so subsequent lines don't over-deduct
             match.qty = remainingQty;
 
-            // 2. Create a separate record for the deployed / OUT portion
-            const outSafeSerial = (match.serialNo || item.serialNo || 'OUT').replace(/[^a-zA-Z0-9_\-\.]/g, '_');
-            const outDocId = `${userId}_${outSafeSerial}_OUT_${Date.now()}_${idx}`;
-            const outRef = doc(db, 'inventory', outDocId);
-
-            const outItemDoc: any = {
-              ...match,
-              userId,
-              serialNo: match.serialNo,
-              partNo: (item.partNo && item.partNo !== 'N/A') ? item.partNo : (match.partNo || 'N/A'),
-              description: item.description || match.description,
-              qty: processQty,
-              uom: uom,
-              status: 'OUT',
-              currentLocation: currentLocation,
-              invoiceNo: cleanInvoiceNo,
-              lastUpdate: serverTimestamp(),
-              unitPrice: unitPrice,
-              amount: amount,
-              remark: `ตัดยอดเบิกออกจากคลังหลัก (เดิมมี ${currentQty} -> เบิกออก ${processQty} คงเหลือในคลัง ${remainingQty} ${uom})`
-            };
-            if (item.vessel || match.vessel) outItemDoc.vessel = item.vessel || match.vessel;
-            if (item.segment || match.segment) outItemDoc.segment = item.segment || match.segment;
-            if (item.customsStatus || match.customsStatus) outItemDoc.customsStatus = item.customsStatus || match.customsStatus;
-
-            batch.set(outRef, outItemDoc, { merge: true });
-
+            // NOTE: Do not create any OUT document in the active inventory collection.
+            // Admin requested that items deducted out leave the inventory page immediately.
+            // The audit record is preserved in the transaction log below.
           } else {
-            // ✂️ Full deduction: Entire stock is dispatched/exported (status becomes OUT)
+            // ✂️ Full deduction: Entire stock is dispatched/exported -> REMOVE completely from active inventory
             const itemRef = doc(db, 'inventory', match._docId);
-            const updatePayload: any = {
-              status: 'OUT',
-              currentLocation: currentLocation,
-              invoiceNo: cleanInvoiceNo,
-              lastUpdate: serverTimestamp(),
-              userId,
-              qty: processQty,
-              remark: match.remark 
-                ? `${match.remark} | ตัดยอดทั้งหมด ${processQty} ${uom} (Inv: ${cleanInvoiceNo})`
-                : `ตัดยอดเบิกออกทั้งหมด ${processQty} ${uom} (Inv: ${cleanInvoiceNo})`
-            };
-            if (unitPrice) updatePayload.unitPrice = unitPrice;
-            if (amount) updatePayload.amount = amount;
-            if (item.vessel) updatePayload.vessel = item.vessel;
-            if (item.segment) updatePayload.segment = item.segment;
-
-            batch.update(itemRef, updatePayload);
+            batch.delete(itemRef);
 
             match.status = 'OUT';
-            match.qty = processQty;
+            match.qty = 0;
           }
         } else {
-          // Item was not previously in inventory: record directly as deployed / OUT
-          let safeSerial = (item.serialNo || '').trim();
-          if (!safeSerial || safeSerial.toUpperCase() === 'N/A') {
-            safeSerial = `OUT-${item.partNo && item.partNo !== 'N/A' ? item.partNo : 'ITEM'}-L${item.lineItem || idx + 1}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
-          }
-          const cleanDocSerial = safeSerial.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
-          const docId = `${userId}_${cleanDocSerial}`;
-          const invRef = doc(db, 'inventory', docId);
-
-          const newOutItem: any = {
-            userId,
-            serialNo: safeSerial,
-            partNo: (item.partNo || 'N/A').trim(),
-            description: (item.description || 'No Description').trim(),
-            status: 'OUT',
-            currentLocation: currentLocation,
-            lastUpdate: serverTimestamp(),
-            importEntryNo: cleanImportEntryNo,
-            importEntryLineNo: cleanImportEntryLineNo,
-            invoiceNo: cleanInvoiceNo,
-            qty: processQty,
-            uom: uom,
-            unitPrice: unitPrice,
-            amount: amount,
-            customEntry: cleanCustomEntry,
-            remark: item.remark || `บันทึกรายการสินค้าส่งออก (Inv: ${cleanInvoiceNo})`
-          };
-          if (item.coo) newOutItem.coo = item.coo;
-          if (item.hsCode) newOutItem.hsCode = item.hsCode;
-          if (item.eccn) newOutItem.eccn = item.eccn;
-          if (item.itemWeight) newOutItem.itemWeight = item.itemWeight;
-          if (item.meaningInThai) newOutItem.meaningInThai = item.meaningInThai;
-          if (item.dimension) newOutItem.dimension = item.dimension;
-          if (item.package) newOutItem.package = item.package;
-          if (item.vessel) newOutItem.vessel = item.vessel;
-          if (item.segment) newOutItem.segment = item.segment;
-          if (item.ibase) newOutItem.ibase = item.ibase;
-          if (item.lineItem) newOutItem.lineItem = item.lineItem;
-          if (item.customsStatus) newOutItem.customsStatus = item.customsStatus;
-
-          batch.set(invRef, newOutItem, { merge: true });
+          // Item was not previously in inventory:
+          // Do NOT create an OUT document in inventory collection (keeps real-time inventory clean).
+          // Full transaction log is created below.
         }
 
         // Add Transaction Log for OUT
@@ -560,7 +482,37 @@ export async function wipeAllData(type: 'inventory' | 'logs' | 'all') {
   console.log('Wipe process completed successfully');
 }
 
-export function subscribeToInventory(callback: (items: InventoryItem[]) => void) {
+export async function cleanupOutInventoryItems(): Promise<number> {
+  const userId = auth.currentUser?.uid;
+  if (!userId) return 0;
+
+  try {
+    const q = query(collection(db, 'inventory'), where('userId', '==', userId));
+    const snapshot = await getDocs(q);
+    const outDocs = snapshot.docs.filter(d => {
+      const data = d.data();
+      return data.status === 'OUT' || (data.qty !== undefined && Number(data.qty) <= 0);
+    });
+
+    if (outDocs.length === 0) return 0;
+
+    for (let i = 0; i < outDocs.length; i += 400) {
+      const batch = writeBatch(db);
+      const chunk = outDocs.slice(i, i + 400);
+      chunk.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+    return outDocs.length;
+  } catch (err) {
+    console.error('Error cleaning up OUT inventory items:', err);
+    return 0;
+  }
+}
+
+export function subscribeToInventory(
+  callback: (items: InventoryItem[]) => void, 
+  options?: { includeOut?: boolean }
+) {
   const userId = auth.currentUser?.uid;
   if (!userId) {
     callback([]);
@@ -571,13 +523,20 @@ export function subscribeToInventory(callback: (items: InventoryItem[]) => void)
     where('userId', '==', userId)
   );
   return onSnapshot(q, (snapshot) => {
-    const items = snapshot.docs
+    let items = snapshot.docs
       .map(doc => doc.data() as InventoryItem)
       .sort((a, b) => {
         const timeA = a.lastUpdate?.toMillis ? a.lastUpdate.toMillis() : 0;
         const timeB = b.lastUpdate?.toMillis ? b.lastUpdate.toMillis() : 0;
         return timeB - timeA; // Descending
       });
+
+    // By default, exclude items that are OUT or have non-positive quantity
+    // so that the real-time inventory displays only active, available stock
+    if (!options?.includeOut) {
+      items = items.filter(i => i.status !== 'OUT' && (i.qty === undefined || Number(i.qty) > 0));
+    }
+
     callback(items);
   }, (error) => {
     handleFirestoreError(error, OperationType.LIST, 'inventory');
@@ -791,42 +750,22 @@ export async function processPartialInOut(params: {
   try {
     if (transactionType === 'OUT') {
       if (processQty >= currentQty) {
-        // Entire stock goes OUT
-        await setDoc(inventoryRef, {
-          ...item,
-          userId,
-          qty: currentQty,
-          status: 'OUT',
-          currentLocation: cleanDestination,
-          lastUpdate: serverTimestamp(),
-          remark: remark ? (item.remark ? `${item.remark} | ${remark}` : remark) : (item.remark || '')
-        }, { merge: true });
+        // Entire stock goes OUT -> Remove completely from inventory
+        await deleteDoc(inventoryRef);
       } else {
-        // Partial OUT: Deduct from existing base item, create new record for OUT portion
+        // Partial OUT: Deduct from existing base item (remains in-base with reduced quantity)
         const remainingQty = currentQty - processQty;
         
-        // 1. Update remaining item at base
         await setDoc(inventoryRef, {
           ...item,
           userId,
           qty: remainingQty,
-          lastUpdate: serverTimestamp()
+          lastUpdate: serverTimestamp(),
+          remark: remark ? (item.remark ? `${item.remark} | ตัดออก ${processQty} เหลือ ${remainingQty}` : remark) : (item.remark || '')
         }, { merge: true });
 
-        // 2. Create a separate record for deployed/OUT portion
-        const outDocId = `${userId}_${item.serialNo.replace(/\//g, '_')}_OUT_${Date.now()}`;
-        const outInventoryRef = doc(db, 'inventory', outDocId);
-        await setDoc(outInventoryRef, {
-          ...item,
-          userId,
-          serialNo: item.serialNo,
-          qty: processQty,
-          status: 'OUT',
-          currentLocation: cleanDestination,
-          invoiceNo: cleanInvoiceNo,
-          lastUpdate: serverTimestamp(),
-          remark: remark || `เบิกออกจากซีเรียลหลัก (${currentQty} -> เหลือ ${remainingQty})`
-        }, { merge: true });
+        // NOTE: Do not create any OUT document in inventory collection.
+        // Audit is preserved in logs below.
       }
 
       // Add transaction log

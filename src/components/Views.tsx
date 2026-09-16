@@ -39,7 +39,8 @@ import {
   importMasterInventory,
   addManualInventoryItem,
   getDisplaySerial,
-  processPartialInOut
+  processPartialInOut,
+  cleanupOutInventoryItems
 } from '../lib/inventoryService';
 import * as XLSX from 'xlsx';
 import { exportItemsToExcel, exportLogsToExcel, generateItemsTSV } from '../lib/exportUtils';
@@ -129,12 +130,18 @@ export function InventoryList() {
         invoiceNo: inOutInvoice,
         remark: inOutRemark
       });
+      const isFullOut = inOutType === 'OUT' && inOutQty >= (inOutItem.qty !== undefined ? Number(inOutItem.qty) : 1);
       const msg = inOutType === 'OUT'
-        ? `ทำรายการตัดสต็อกเบิกออกจำนวน ${inOutQty} ${inOutItem.uom || 'EA'} สำเร็จแล้ว!`
+        ? (isFullOut 
+            ? `ตัดสต็อกเบิกออกทั้งหมด ${inOutQty} ${inOutItem.uom || 'EA'} สำเร็จ! รายการนี้ถูกนำออกจากระบบคงคลังเรียบร้อยแล้ว`
+            : `ทำรายการตัดสต็อกเบิกออกจำนวน ${inOutQty} ${inOutItem.uom || 'EA'} สำเร็จแล้ว!`)
         : `ทำรายการรับเข้าเพิ่มจำนวน ${inOutQty} ${inOutItem.uom || 'EA'} เรียบร้อยแล้ว!`;
       setCopyNotification(msg);
       setTimeout(() => setCopyNotification(null), 5000);
       setInOutItem(null);
+      if (isFullOut && selectedItem?.serialNo === inOutItem.serialNo) {
+        setSelectedItem(null);
+      }
     } catch (err: any) {
       console.error("Error processing in/out:", err);
       alert('เกิดข้อผิดพลาด: ' + (err.message || 'ไม่สามารถตัดสต็อกได้'));
@@ -239,6 +246,8 @@ export function InventoryList() {
 
 
   useEffect(() => {
+    // Automatically purge any residual OUT items from the inventory database to ensure real-time clarity
+    cleanupOutInventoryItems().catch(console.error);
     return subscribeToInventory(setItems);
   }, []);
 
@@ -257,6 +266,11 @@ export function InventoryList() {
   ).sort() as string[];
 
   const filtered = items.filter(i => {
+    // Strictly exclude any OUT or 0-qty items: admin wants items that are cut/invoiced out to leave the inventory view completely
+    if (i.status === 'OUT' || (i.qty !== undefined && Number(i.qty) <= 0)) {
+      return false;
+    }
+
     const matchesSearch = 
       i.serialNo.toLowerCase().includes(search.toLowerCase()) || 
       i.description.toLowerCase().includes(search.toLowerCase()) ||
@@ -2506,7 +2520,7 @@ export function Dashboard() {
     : logs;
 
   const totalIn = filteredItems.filter(i => i.status === 'IN').length;
-  const totalOut = filteredItems.filter(i => i.status === 'OUT').length;
+  const totalOut = filteredLogs.filter(l => l.transactionType === 'OUT').length;
   
   const stats = [
     { 
