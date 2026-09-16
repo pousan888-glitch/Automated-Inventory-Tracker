@@ -165,91 +165,368 @@ export async function processInventoryUpdate(
     throw new Error('User must be authenticated to process inventory updates.');
   }
 
-  const isLeavingBase = (header.shipFrom || '').toLowerCase().includes('schlumberger');
+  const isLeavingBase = (header.shipFrom || '').toLowerCase().includes('schlumberger') ||
+    (header.consignee || '').toLowerCase().includes('rig') ||
+    (header.consignee || '').toLowerCase().includes('offshore') ||
+    (header.consignee || '').toLowerCase().includes('export');
+
   const transactionType: 'IN' | 'OUT' = overrideType !== undefined ? overrideType : (isLeavingBase ? 'OUT' : 'IN');
   const currentLocation = transactionType === 'OUT' ? (header.consignee || 'ต่างประเทศ (Exported)') : 'In-Base';
+  const cleanInvoiceNo = (header.invoiceNo || 'INV-UPDATE').trim();
 
-  for (const item of items) {
-    const serialNo = item.serialNo.trim();
-    if (!serialNo) continue;
+  // 1. Fetch current inventory of this user to accurately match and calculate stock deduction
+  const existingSnapshot = await getDocs(
+    query(collection(db, 'inventory'), where('userId', '==', userId))
+  );
 
-    // Separate storage key for each user: users will not overwrite each other
-    const docId = `${userId}_${serialNo.replace(/\//g, '_')}`;
-    const inventoryRef = doc(db, 'inventory', docId);
-    const logRef = collection(db, 'logs');
+  const existingItems: (InventoryItem & { _docId: string })[] = [];
+  existingSnapshot.forEach(d => {
+    existingItems.push({ ...(d.data() as InventoryItem), _docId: d.id });
+  });
 
-    try {
-      // Update/Create Master Inventory for this user
-      await setDoc(inventoryRef, {
-        userId,
-        serialNo,
-        partNo: item.partNo,
-        description: item.description,
-        status: transactionType,
-        currentLocation: currentLocation,
-        lastUpdate: serverTimestamp(),
-        importEntryNo: item.importEntryNo || item.customEntry || '',
-        importEntryLineNo: item.importEntryLineNo || '',
-        invoiceNo: header.invoiceNo,
+  // Helper matching function
+  const findMatch = (invItem: any) => {
+    const rawSerial = (invItem.serialNo || '').trim();
+    const cleanSerial = rawSerial.toUpperCase();
+    const normSerial = cleanSerial.replace(/[^A-Z0-9]/g, '');
+    const cleanPart = (invItem.partNo || '').trim().toUpperCase();
+    const cleanDesc = (invItem.description || '').trim().toLowerCase();
 
-        // Bind CIPL metadata
-        coo: item.coo || '',
-        hsCode: item.hsCode || '',
-        eccn: item.eccn || '',
-        qty: item.qty !== undefined ? Number(item.qty) : 1,
-        uom: item.uom || 'EA',
-        unitPrice: item.unitPrice !== undefined ? Number(item.unitPrice) : 0,
-        amount: item.amount !== undefined ? Number(item.amount) : 0,
-        itemWeight: item.itemWeight || '',
-        meaningInThai: item.meaningInThai || '',
-        dimension: item.dimension || '',
-        package: item.package || '',
-        customEntry: item.customEntry || item.importEntryNo || '',
-        vessel: item.vessel || '',
-        segment: item.segment || '',
-        ibase: item.ibase || '',
-        remark: item.remark || '',
-        lineItem: item.lineItem || '',
-        customsStatus: item.customsStatus || ''
-      }, { merge: true });
+    // 1. Exact serial match (prefer status IN if multiple exist)
+    if (cleanSerial && cleanSerial !== 'N/A' && !cleanSerial.startsWith('N/A-')) {
+      const inSerialMatch = existingItems.find(e => 
+        (e.serialNo || '').trim().toUpperCase() === cleanSerial && e.status === 'IN'
+      );
+      if (inSerialMatch) return inSerialMatch;
 
-      // Add Transaction Log for this user
-      await addDoc(logRef, {
-        userId,
-        date: serverTimestamp(),
-        invoiceNo: header.invoiceNo,
-        transactionType,
-        serialNo,
-        origin: header.shipFrom,
-        destination: header.consignee,
-        lineItem: item.lineItem,
-        importEntryNo: item.importEntryNo || item.customEntry || '',
-        importEntryLineNo: item.importEntryLineNo,
+      const anySerialMatch = existingItems.find(e => 
+        (e.serialNo || '').trim().toUpperCase() === cleanSerial
+      );
+      if (anySerialMatch) return anySerialMatch;
 
-        // Bind log level metadata
-        partNo: item.partNo,
-        description: item.description,
-        coo: item.coo || '',
-        hsCode: item.hsCode || '',
-        eccn: item.eccn || '',
-        qty: item.qty !== undefined ? Number(item.qty) : 1,
-        uom: item.uom || 'EA',
-        unitPrice: item.unitPrice !== undefined ? Number(item.unitPrice) : 0,
-        amount: item.amount !== undefined ? Number(item.amount) : 0,
-        itemWeight: item.itemWeight || '',
-        meaningInThai: item.meaningInThai || '',
-        dimension: item.dimension || '',
-        package: item.package || '',
-        customEntry: item.customEntry || item.importEntryNo || '',
-        vessel: item.vessel || '',
-        segment: item.segment || '',
-        ibase: item.ibase || '',
-        remark: item.remark || '',
-        customsStatus: item.customsStatus || ''
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `inventory/${serialNo}`);
+      // Normalized serial match (without symbols/spaces)
+      if (normSerial.length >= 3) {
+        const normInMatch = existingItems.find(e => {
+          const eNorm = (e.serialNo || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+          return eNorm === normSerial && e.status === 'IN';
+        });
+        if (normInMatch) return normInMatch;
+
+        const normAnyMatch = existingItems.find(e => {
+          const eNorm = (e.serialNo || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+          return eNorm === normSerial;
+        });
+        if (normAnyMatch) return normAnyMatch;
+      }
     }
+
+    // 2. Part Number match (for consumables/parts or items where serial is N/A)
+    if (cleanPart && cleanPart !== 'N/A' && cleanPart !== '-') {
+      const inPartMatch = existingItems.find(e => 
+        (e.partNo || '').trim().toUpperCase() === cleanPart && e.status === 'IN'
+      );
+      if (inPartMatch) return inPartMatch;
+
+      const anyPartMatch = existingItems.find(e => 
+        (e.partNo || '').trim().toUpperCase() === cleanPart
+      );
+      if (anyPartMatch) return anyPartMatch;
+    }
+
+    // 3. Description match as fallback
+    if (cleanDesc && cleanDesc.length > 5 && !cleanDesc.includes('no description')) {
+      const inDescMatch = existingItems.find(e => {
+        const eDesc = (e.description || '').trim().toLowerCase();
+        return (eDesc === cleanDesc || eDesc.includes(cleanDesc) || cleanDesc.includes(eDesc)) && e.status === 'IN';
+      });
+      if (inDescMatch) return inDescMatch;
+    }
+
+    return null;
+  };
+
+  // Chunk items into batches of 80 (since each item can perform up to 3 operations: update, create OUT, add log)
+  for (let i = 0; i < items.length; i += 80) {
+    const batch = writeBatch(db);
+    const chunk = items.slice(i, i + 80);
+
+    chunk.forEach((item, chunkIdx) => {
+      const idx = i + chunkIdx;
+      const match = findMatch(item);
+      const processQty = (item.qty !== undefined && Number(item.qty) > 0) ? Number(item.qty) : 1;
+      const uom = (item.uom || match?.uom || 'EA').trim();
+      const cleanCustomEntry = (item.customEntry || item.importEntryNo || match?.customEntry || '').trim();
+      const cleanImportEntryNo = (item.importEntryNo || item.customEntry || match?.importEntryNo || '').trim();
+      const cleanImportEntryLineNo = (item.importEntryLineNo || match?.importEntryLineNo || '').trim();
+      const unitPrice = item.unitPrice !== undefined ? Number(item.unitPrice) : (match?.unitPrice || 0);
+      const amount = item.amount !== undefined ? Number(item.amount) : (unitPrice * processQty);
+
+      if (transactionType === 'OUT') {
+        // ============================================
+        // ✂️ STOCK DEDUCTION (ตัดยอดสินค้าออกจากคลัง)
+        // ============================================
+        if (match) {
+          const currentQty = (match.qty !== undefined && Number(match.qty) > 0) ? Number(match.qty) : 1;
+
+          if (processQty < currentQty) {
+            // ✂️ Partial deduction: Remaining stock stays in base (IN), deducted portion goes OUT
+            const remainingQty = currentQty - processQty;
+
+            // 1. Update remaining item at base (status IN, reduced quantity)
+            const baseRef = doc(db, 'inventory', match._docId);
+            batch.update(baseRef, {
+              qty: remainingQty,
+              lastUpdate: serverTimestamp(),
+              userId,
+              remark: match.remark 
+                ? `${match.remark} | ตัดยอดออก ${processQty} ${uom} (Inv: ${cleanInvoiceNo}) คงเหลือ ${remainingQty}`
+                : `ตัดยอดออก ${processQty} ${uom} (Inv: ${cleanInvoiceNo}) คงเหลือ ${remainingQty}`
+            });
+
+            // Update in-memory copy so subsequent lines don't over-deduct
+            match.qty = remainingQty;
+
+            // 2. Create a separate record for the deployed / OUT portion
+            const outSafeSerial = (match.serialNo || item.serialNo || 'OUT').replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+            const outDocId = `${userId}_${outSafeSerial}_OUT_${Date.now()}_${idx}`;
+            const outRef = doc(db, 'inventory', outDocId);
+
+            const outItemDoc: any = {
+              ...match,
+              userId,
+              serialNo: match.serialNo,
+              partNo: (item.partNo && item.partNo !== 'N/A') ? item.partNo : (match.partNo || 'N/A'),
+              description: item.description || match.description,
+              qty: processQty,
+              uom: uom,
+              status: 'OUT',
+              currentLocation: currentLocation,
+              invoiceNo: cleanInvoiceNo,
+              lastUpdate: serverTimestamp(),
+              unitPrice: unitPrice,
+              amount: amount,
+              remark: `ตัดยอดเบิกออกจากคลังหลัก (เดิมมี ${currentQty} -> เบิกออก ${processQty} คงเหลือในคลัง ${remainingQty} ${uom})`
+            };
+            if (item.vessel || match.vessel) outItemDoc.vessel = item.vessel || match.vessel;
+            if (item.segment || match.segment) outItemDoc.segment = item.segment || match.segment;
+            if (item.customsStatus || match.customsStatus) outItemDoc.customsStatus = item.customsStatus || match.customsStatus;
+
+            batch.set(outRef, outItemDoc, { merge: true });
+
+          } else {
+            // ✂️ Full deduction: Entire stock is dispatched/exported (status becomes OUT)
+            const itemRef = doc(db, 'inventory', match._docId);
+            const updatePayload: any = {
+              status: 'OUT',
+              currentLocation: currentLocation,
+              invoiceNo: cleanInvoiceNo,
+              lastUpdate: serverTimestamp(),
+              userId,
+              qty: processQty,
+              remark: match.remark 
+                ? `${match.remark} | ตัดยอดทั้งหมด ${processQty} ${uom} (Inv: ${cleanInvoiceNo})`
+                : `ตัดยอดเบิกออกทั้งหมด ${processQty} ${uom} (Inv: ${cleanInvoiceNo})`
+            };
+            if (unitPrice) updatePayload.unitPrice = unitPrice;
+            if (amount) updatePayload.amount = amount;
+            if (item.vessel) updatePayload.vessel = item.vessel;
+            if (item.segment) updatePayload.segment = item.segment;
+
+            batch.update(itemRef, updatePayload);
+
+            match.status = 'OUT';
+            match.qty = processQty;
+          }
+        } else {
+          // Item was not previously in inventory: record directly as deployed / OUT
+          let safeSerial = (item.serialNo || '').trim();
+          if (!safeSerial || safeSerial.toUpperCase() === 'N/A') {
+            safeSerial = `OUT-${item.partNo && item.partNo !== 'N/A' ? item.partNo : 'ITEM'}-L${item.lineItem || idx + 1}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+          }
+          const cleanDocSerial = safeSerial.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+          const docId = `${userId}_${cleanDocSerial}`;
+          const invRef = doc(db, 'inventory', docId);
+
+          const newOutItem: any = {
+            userId,
+            serialNo: safeSerial,
+            partNo: (item.partNo || 'N/A').trim(),
+            description: (item.description || 'No Description').trim(),
+            status: 'OUT',
+            currentLocation: currentLocation,
+            lastUpdate: serverTimestamp(),
+            importEntryNo: cleanImportEntryNo,
+            importEntryLineNo: cleanImportEntryLineNo,
+            invoiceNo: cleanInvoiceNo,
+            qty: processQty,
+            uom: uom,
+            unitPrice: unitPrice,
+            amount: amount,
+            customEntry: cleanCustomEntry,
+            remark: item.remark || `บันทึกรายการสินค้าส่งออก (Inv: ${cleanInvoiceNo})`
+          };
+          if (item.coo) newOutItem.coo = item.coo;
+          if (item.hsCode) newOutItem.hsCode = item.hsCode;
+          if (item.eccn) newOutItem.eccn = item.eccn;
+          if (item.itemWeight) newOutItem.itemWeight = item.itemWeight;
+          if (item.meaningInThai) newOutItem.meaningInThai = item.meaningInThai;
+          if (item.dimension) newOutItem.dimension = item.dimension;
+          if (item.package) newOutItem.package = item.package;
+          if (item.vessel) newOutItem.vessel = item.vessel;
+          if (item.segment) newOutItem.segment = item.segment;
+          if (item.ibase) newOutItem.ibase = item.ibase;
+          if (item.lineItem) newOutItem.lineItem = item.lineItem;
+          if (item.customsStatus) newOutItem.customsStatus = item.customsStatus;
+
+          batch.set(invRef, newOutItem, { merge: true });
+        }
+
+        // Add Transaction Log for OUT
+        const logDocRef = doc(collection(db, 'logs'));
+        batch.set(logDocRef, {
+          userId,
+          date: serverTimestamp(),
+          invoiceNo: cleanInvoiceNo,
+          transactionType: 'OUT',
+          serialNo: match?.serialNo || item.serialNo || 'N/A',
+          origin: header.shipFrom || 'In-Base',
+          destination: currentLocation,
+          lineItem: item.lineItem || match?.lineItem || '',
+          importEntryNo: cleanImportEntryNo,
+          importEntryLineNo: cleanImportEntryLineNo,
+          partNo: item.partNo || match?.partNo || 'N/A',
+          description: item.description || match?.description || 'No Description',
+          coo: item.coo || match?.coo || '',
+          hsCode: item.hsCode || match?.hsCode || '',
+          eccn: item.eccn || match?.eccn || '',
+          qty: processQty,
+          uom: uom,
+          unitPrice: unitPrice,
+          amount: amount,
+          remark: `ตัดยอดเบิกออกจากคลังจำนวน ${processQty} ${uom} ตามใบกำกับ ${cleanInvoiceNo}`
+        });
+
+      } else {
+        // ============================================
+        // 📥 RESTOCK / INCOMING (รับสินค้าเข้าคลัง)
+        // ============================================
+        if (match) {
+          const currentQty = (match.qty !== undefined && Number(match.qty) > 0) ? Number(match.qty) : 1;
+          const isUniqueSerial = match.serialNo && !match.serialNo.toUpperCase().startsWith('N/A');
+
+          if (match.status === 'OUT') {
+            // Returning from external/deployed back to Base
+            const itemRef = doc(db, 'inventory', match._docId);
+            batch.update(itemRef, {
+              status: 'IN',
+              currentLocation: 'In-Base',
+              invoiceNo: cleanInvoiceNo,
+              lastUpdate: serverTimestamp(),
+              userId,
+              qty: processQty >= currentQty ? processQty : currentQty,
+              importEntryNo: cleanImportEntryNo || match.importEntryNo || '',
+              importEntryLineNo: cleanImportEntryLineNo || match.importEntryLineNo || '',
+              remark: match.remark 
+                ? `${match.remark} | รับคืนเข้าคลัง (Inv: ${cleanInvoiceNo})`
+                : `รับคืนเข้าคลัง (Inv: ${cleanInvoiceNo})`
+            });
+            match.status = 'IN';
+          } else {
+            // Already IN: For bulk/part items, increase stock qty
+            const newQty = isUniqueSerial ? (item.qty !== undefined ? Number(item.qty) : currentQty) : (currentQty + processQty);
+            const itemRef = doc(db, 'inventory', match._docId);
+
+            const updatePayload: any = {
+              qty: newQty,
+              lastUpdate: serverTimestamp(),
+              userId,
+              invoiceNo: cleanInvoiceNo,
+              importEntryNo: cleanImportEntryNo || match.importEntryNo || '',
+              importEntryLineNo: cleanImportEntryLineNo || match.importEntryLineNo || '',
+              remark: match.remark 
+                ? `${match.remark} | เพิ่มสต็อก +${processQty} ${uom} (Inv: ${cleanInvoiceNo})`
+                : `เพิ่มสต็อก +${processQty} ${uom} (Inv: ${cleanInvoiceNo})`
+            };
+            if (unitPrice) updatePayload.unitPrice = unitPrice;
+            if (amount) updatePayload.amount = amount;
+            if (item.vessel) updatePayload.vessel = item.vessel;
+            if (item.segment) updatePayload.segment = item.segment;
+
+            batch.update(itemRef, updatePayload);
+            match.qty = newQty;
+          }
+        } else {
+          // Brand new item received at Base
+          let safeSerial = (item.serialNo || '').trim();
+          if (!safeSerial || safeSerial.toUpperCase() === 'N/A') {
+            safeSerial = `IN-${item.partNo && item.partNo !== 'N/A' ? item.partNo : 'ITEM'}-L${item.lineItem || idx + 1}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+          }
+          const cleanDocSerial = safeSerial.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+          const docId = `${userId}_${cleanDocSerial}`;
+          const invRef = doc(db, 'inventory', docId);
+
+          const newInItem: any = {
+            userId,
+            serialNo: safeSerial,
+            partNo: (item.partNo || 'N/A').trim(),
+            description: (item.description || 'No Description').trim(),
+            status: 'IN',
+            currentLocation: 'In-Base',
+            lastUpdate: serverTimestamp(),
+            importEntryNo: cleanImportEntryNo,
+            importEntryLineNo: cleanImportEntryLineNo,
+            invoiceNo: cleanInvoiceNo,
+            qty: processQty,
+            uom: uom,
+            unitPrice: unitPrice,
+            amount: amount,
+            customEntry: cleanCustomEntry,
+            remark: item.remark || `รับสินค้าเข้าคลังใหม่ (Inv: ${cleanInvoiceNo})`
+          };
+          if (item.coo) newInItem.coo = item.coo;
+          if (item.hsCode) newInItem.hsCode = item.hsCode;
+          if (item.eccn) newInItem.eccn = item.eccn;
+          if (item.itemWeight) newInItem.itemWeight = item.itemWeight;
+          if (item.meaningInThai) newInItem.meaningInThai = item.meaningInThai;
+          if (item.dimension) newInItem.dimension = item.dimension;
+          if (item.package) newInItem.package = item.package;
+          if (item.vessel) newInItem.vessel = item.vessel;
+          if (item.segment) newInItem.segment = item.segment;
+          if (item.ibase) newInItem.ibase = item.ibase;
+          if (item.lineItem) newInItem.lineItem = item.lineItem;
+          if (item.customsStatus) newInItem.customsStatus = item.customsStatus;
+
+          batch.set(invRef, newInItem, { merge: true });
+        }
+
+        // Add Transaction Log for IN
+        const logDocRef = doc(collection(db, 'logs'));
+        batch.set(logDocRef, {
+          userId,
+          date: serverTimestamp(),
+          invoiceNo: cleanInvoiceNo,
+          transactionType: 'IN',
+          serialNo: match?.serialNo || item.serialNo || 'N/A',
+          origin: header.shipFrom || 'Vendor/Supplier',
+          destination: 'In-Base',
+          lineItem: item.lineItem || match?.lineItem || '',
+          importEntryNo: cleanImportEntryNo,
+          importEntryLineNo: cleanImportEntryLineNo,
+          partNo: item.partNo || match?.partNo || 'N/A',
+          description: item.description || match?.description || 'No Description',
+          coo: item.coo || match?.coo || '',
+          hsCode: item.hsCode || match?.hsCode || '',
+          eccn: item.eccn || match?.eccn || '',
+          qty: processQty,
+          uom: uom,
+          unitPrice: unitPrice,
+          amount: amount,
+          remark: `รับสินค้าเข้าคลังจำนวน ${processQty} ${uom} ตามใบกำกับ ${cleanInvoiceNo}`
+        });
+      }
+    });
+
+    await batch.commit();
   }
 }
 

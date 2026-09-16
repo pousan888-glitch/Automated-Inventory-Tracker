@@ -95,6 +95,7 @@ export default function FileProcessor() {
   const [fzExtractedData, setFzExtractedData] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [lastCommitType, setLastCommitType] = useState<'IN' | 'OUT'>('OUT');
   
   // Track existing master inventory items
   const [existingInventory, setExistingInventory] = useState<InventoryItem[]>([]);
@@ -107,6 +108,56 @@ export default function FileProcessor() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Match item with actual inventory for real-time stock deduction preview
+  const getInventoryMatch = useCallback((item: any) => {
+    const rawSerial = (item.serialNo || '').trim();
+    const cleanSerial = rawSerial.toUpperCase();
+    const normSerial = cleanSerial.replace(/[^A-Z0-9]/g, '');
+    const cleanPart = (item.partNo || '').trim().toUpperCase();
+    const cleanDesc = (item.description || '').trim().toLowerCase();
+
+    if (cleanSerial && cleanSerial !== 'N/A' && !cleanSerial.startsWith('N/A-')) {
+      const inMatch = existingInventory.find(e => 
+        (e.serialNo || '').trim().toUpperCase() === cleanSerial && e.status === 'IN'
+      );
+      if (inMatch) return inMatch;
+      const anyMatch = existingInventory.find(e => 
+        (e.serialNo || '').trim().toUpperCase() === cleanSerial
+      );
+      if (anyMatch) return anyMatch;
+      if (normSerial.length >= 3) {
+        const normInMatch = existingInventory.find(e => 
+          (e.serialNo || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '') === normSerial && e.status === 'IN'
+        );
+        if (normInMatch) return normInMatch;
+        const normAnyMatch = existingInventory.find(e => 
+          (e.serialNo || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '') === normSerial
+        );
+        if (normAnyMatch) return normAnyMatch;
+      }
+    }
+
+    if (cleanPart && cleanPart !== 'N/A' && cleanPart !== '-') {
+      const partInMatch = existingInventory.find(e => 
+        (e.partNo || '').trim().toUpperCase() === cleanPart && e.status === 'IN'
+      );
+      if (partInMatch) return partInMatch;
+      const partAnyMatch = existingInventory.find(e => 
+        (e.partNo || '').trim().toUpperCase() === cleanPart
+      );
+      if (partAnyMatch) return partAnyMatch;
+    }
+
+    if (cleanDesc && cleanDesc.length > 5 && !cleanDesc.includes('no description')) {
+      const descMatch = existingInventory.find(e => 
+        (e.description || '').trim().toLowerCase() === cleanDesc && e.status === 'IN'
+      );
+      if (descMatch) return descMatch;
+    }
+
+    return null;
+  }, [existingInventory]);
 
   // Check if a row has a potential match in current inventory
   const isFuzzyMatch = useCallback((item: any) => {
@@ -298,36 +349,47 @@ export default function FileProcessor() {
 
         if (tableHeaderIdx !== -1) {
           const headerRow = (jsonData[tableHeaderIdx] as any[]).map(h => String(h || '').toLowerCase());
-          const getIdx = (name: string) => headerRow.findIndex(h => h && h.toLowerCase().replace(/[^a-z0-9]/g, '').includes(name.toLowerCase().replace(/[^a-z0-9]/g, '')));
           
-          const sIdx = getIdx('serialno');
-          const pIdx = getIdx('partno');
-          const dIdx = getIdx('description');
-          const lIdx = getIdx('lineitem') !== -1 ? getIdx('lineitem') : getIdx('item');
-          const ienIdx = getIdx('importentryno');
-          const ielIdx = getIdx('importentryline');
+          const getIdxMulti = (...candidates: string[]) => {
+            return headerRow.findIndex(h => {
+              if (!h) return false;
+              const cleanH = String(h).toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (!cleanH) return false;
+              return candidates.some(cand => {
+                const cleanCand = cand.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return cleanH === cleanCand || cleanH.includes(cleanCand) || cleanCand.includes(cleanH);
+              });
+            });
+          };
+
+          const sIdx = getIdxMulti('serialno', 'serialnumber', 'serial', 'sn', 'serno', 'sno', 'seriallot', 'ser');
+          const pIdx = getIdxMulti('partno', 'partnumber', 'part', 'itemcode', 'materialno', 'material', 'pno');
+          const dIdx = getIdxMulti('description', 'desc', 'itemdescription', 'itemname', 'detail', 'goodsdescription', 'specification');
+          const lIdx = getIdxMulti('lineitem', 'itemno', 'itemnumber', 'line', 'item', 'no', 'seq', 'pos');
+          const ienIdx = getIdxMulti('importentryno', 'importentry', 'customentry', 'customsentry', 'entryno', 'inboundnumber');
+          const ielIdx = getIdxMulti('importentrylineno', 'importentryline', 'lineentry', 'entryline', 'customentryline');
 
           // Retrieve optional administrative properties
-          const cooIdx = getIdx('coo') !== -1 ? getIdx('coo') : getIdx('countryoforigin');
-          const hsIdx = getIdx('hscode') !== -1 ? getIdx('hscode') : getIdx('hs');
-          const eccnIdx = getIdx('eccn');
-          const qtyIdx = getIdx('qty') !== -1 ? getIdx('qty') : getIdx('quantity');
-          const uomIdx = getIdx('uom') !== -1 ? getIdx('uom') : getIdx('unitofmeasure');
-          const unitPriceIdx = getIdx('unitprice') !== -1 ? getIdx('unitprice') : getIdx('unit');
-          const amountIdx = getIdx('amount');
-          const weightIdx = getIdx('itemweight') !== -1 ? getIdx('itemweight') : (getIdx('weight') !== -1 ? getIdx('weight') : getIdx('itemweightkg'));
-          const thaiIdx = getIdx('meaninginthai') !== -1 ? getIdx('meaninginthai') : (getIdx('thai') !== -1 ? getIdx('thai') : getIdx('meaning'));
-          const dimIdx = getIdx('dimension') !== -1 ? getIdx('dimension') : getIdx('dimention');
-          const pkgIdx = getIdx('package');
-          const customIdx = getIdx('customentry') !== -1 ? getIdx('customentry') : getIdx('custom');
-          const vesselIdx = getIdx('vessel');
-          const segmentIdx = getIdx('segment');
-          const ibaseIdx = getIdx('ibase');
-          const remarkIdx = getIdx('remark');
+          const cooIdx = getIdxMulti('coo', 'countryoforigin', 'country', 'origin');
+          const hsIdx = getIdxMulti('hscode', 'hs', 'harmonizedcode', 'tariffcode');
+          const eccnIdx = getIdxMulti('eccn', 'eccnno');
+          const qtyIdx = getIdxMulti('qty', 'quantity', 'quantities', 'totalqty', 'amountqty', 'pcs', 'count');
+          const uomIdx = getIdxMulti('uom', 'unit', 'unittype', 'unitofmeasure');
+          const unitPriceIdx = getIdxMulti('unitprice', 'price', 'unitcost', 'rate', 'unitusd');
+          const amountIdx = getIdxMulti('amount', 'totalamount', 'totalprice', 'totalusd', 'value');
+          const weightIdx = getIdxMulti('itemweight', 'weight', 'netweight', 'grossweight', 'kg', 'itemweightkg', 'nw', 'gw');
+          const thaiIdx = getIdxMulti('meaninginthai', 'thai', 'meaning', 'thaidescription');
+          const dimIdx = getIdxMulti('dimension', 'dimensions', 'dimention', 'size', 'measurement');
+          const pkgIdx = getIdxMulti('package', 'packagetype', 'pkg', 'packing');
+          const customIdx = getIdxMulti('customentry', 'custom', 'declarationno');
+          const vesselIdx = getIdxMulti('vessel', 'flight', 'carrier', 'truck', 'shipname');
+          const segmentIdx = getIdxMulti('segment', 'dept', 'division', 'dutyincome');
+          const ibaseIdx = getIdxMulti('ibase', 'base', 'assetno', 'asset');
+          const remarkIdx = getIdxMulti('remark', 'remarks', 'note', 'notes', 'comment');
 
           for (let i = tableHeaderIdx + 1; i < jsonData.length; i++) {
             const row = jsonData[i] as any[];
-            if (!row) continue;
+            if (!row || row.length === 0) continue;
 
             // Stop parsing if we hit the total row or packing details section
             const rowString = row.map(cell => cell ? String(cell).toLowerCase().trim() : '').join(' ');
@@ -335,26 +397,41 @@ export default function FileProcessor() {
               break;
             }
 
-            if (sIdx !== -1 && row[sIdx]) {
+            const rawSerial = sIdx !== -1 && row[sIdx] ? String(row[sIdx]).trim() : '';
+            const rawPart = pIdx !== -1 && row[pIdx] ? String(row[pIdx]).trim() : '';
+            const rawDesc = dIdx !== -1 && row[dIdx] ? String(row[dIdx]).trim() : '';
+            const rawQty = qtyIdx !== -1 && row[qtyIdx] !== undefined ? Number(row[qtyIdx]) : undefined;
+
+            // Valid row if it has serial, part, description, or qty
+            if (rawSerial || rawPart || rawDesc || (rawQty !== undefined && !isNaN(rawQty) && rawQty > 0)) {
+              const lineItemVal = String((lIdx !== -1 && row[lIdx]) || (i - tableHeaderIdx));
+              const partNoVal = rawPart || 'N/A';
+              
+              // If serial is empty or N/A, generate a deterministic serial so the item is never dropped
+              let serialNoVal = rawSerial;
+              if (!serialNoVal || serialNoVal.toUpperCase() === 'N/A' || serialNoVal === '-') {
+                serialNoVal = `N/A-${partNoVal !== 'N/A' ? partNoVal : 'ITEM'}-L${lineItemVal}`;
+              }
+
               const parsedIenVal = ienIdx !== -1 ? String(row[ienIdx] || '').trim() : '';
               const parsedCustomVal = customIdx !== -1 ? String(row[customIdx] || '').trim() : '';
               const finalEntryNo = parsedIenVal || parsedCustomVal || '';
 
               items.push({
-                lineItem: String(row[lIdx] || i - tableHeaderIdx),
-                partNo: String(row[pIdx] || 'N/A'),
-                serialNo: String(row[sIdx]).trim(),
-                description: String(row[dIdx] || 'No Description'),
+                lineItem: lineItemVal,
+                partNo: partNoVal,
+                serialNo: serialNoVal,
+                description: rawDesc || 'No Description',
                 importEntryNo: finalEntryNo,
                 importEntryLineNo: ielIdx !== -1 ? String(row[ielIdx] || '').trim() : '',
 
                 coo: cooIdx !== -1 ? String(row[cooIdx] || '') : '',
                 hsCode: hsIdx !== -1 ? String(row[hsIdx] || '') : '',
                 eccn: eccnIdx !== -1 ? String(row[eccnIdx] || '') : '',
-                qty: qtyIdx !== -1 && row[qtyIdx] !== undefined ? Number(row[qtyIdx]) : 1,
-                uom: uomIdx !== -1 ? String(row[uomIdx] || 'EA') : 'EA',
-                unitPrice: unitPriceIdx !== -1 && row[unitPriceIdx] !== undefined ? Number(row[unitPriceIdx]) : 0,
-                amount: amountIdx !== -1 && row[amountIdx] !== undefined ? Number(row[amountIdx]) : 0,
+                qty: rawQty !== undefined && !isNaN(rawQty) && rawQty > 0 ? Number(rawQty) : 1,
+                uom: uomIdx !== -1 ? String(row[uomIdx] || 'EA').trim() : 'EA',
+                unitPrice: unitPriceIdx !== -1 && row[unitPriceIdx] !== undefined && !isNaN(Number(row[unitPriceIdx])) ? Number(row[unitPriceIdx]) : 0,
+                amount: amountIdx !== -1 && row[amountIdx] !== undefined && !isNaN(Number(row[amountIdx])) ? Number(row[amountIdx]) : 0,
                 itemWeight: weightIdx !== -1 ? String(row[weightIdx] || '') : '',
                 meaningInThai: thaiIdx !== -1 ? String(row[thaiIdx] || '') : '',
                 dimension: dimIdx !== -1 ? String(row[dimIdx] || '') : '',
@@ -559,13 +636,16 @@ export default function FileProcessor() {
         }
 
         if (items.length === 0) {
-          // Fallback if no serial numbers found in header search
-          // Try scanning all rows for potentially useful data
-          throw new Error('No items with Serial Numbers found in the file.');
+          throw new Error('ไม่พบรายการสินค้าในไฟล์ กรุณาตรวจสอบหัวตารางและข้อมูลในเอกสาร');
         }
 
-        const isLeaving = (shipFrom || '').toLowerCase().includes('schlumberger');
-        setUploadType(isLeaving ? 'OUT' : 'IN');
+        const leavingKeywords = ['schlumberger', 'songkhla', 'base', 'yard', 'rig', 'offshore', 'export', 'ต่างประเทศ'];
+        const isLeaving = leavingKeywords.some(k => 
+          (shipFrom || '').toLowerCase().includes(k) || 
+          (consignee || '').toLowerCase().includes(k)
+        );
+
+        setUploadType(prev => (prev ? prev : (isLeaving ? 'OUT' : 'IN')));
 
         setExtractedData({
           header: { invoiceNo, date, shipFrom, consignee },
@@ -733,6 +813,7 @@ export default function FileProcessor() {
     if (!extractedData) return;
     setIsProcessing(true);
     try {
+      setLastCommitType(uploadType);
       await processInventoryUpdate(extractedData.header, extractedData.items, uploadType);
       setSuccess(true);
       setExtractedData(null);
@@ -887,19 +968,27 @@ export default function FileProcessor() {
         {success && (
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center gap-3 p-16 bg-white border-4 border-slate-900 neo-brutalism-shadow"
+            className="flex flex-col items-center gap-3 p-12 bg-white border-4 border-slate-900 neo-brutalism-shadow"
           >
-            <div className="w-20 h-20 bg-emerald-100 border-2 border-emerald-600 flex items-center justify-center mb-4">
+            <div className="w-20 h-20 bg-emerald-100 border-2 border-emerald-600 flex items-center justify-center mb-2">
               <CheckCircle2 className="w-10 h-10 text-emerald-600" />
             </div>
-            <h3 className="text-xl font-black uppercase tracking-tighter">Handshake Successful</h3>
-            <p className="text-[10px] opacity-40 uppercase tracking-widest font-mono">Inventory updated & Transaction Commited.</p>
-            <button 
-              onClick={() => setSuccess(false)}
-              className="mt-8 px-16 py-4 bg-slate-900 text-white text-[10px] uppercase tracking-widest font-black active-neo-brutalism neo-brutalism-shadow"
-            >
-              System Reset
-            </button>
+            <h3 className="text-xl font-black uppercase tracking-tight text-slate-900">
+              {lastCommitType === 'OUT' ? '✂️ ตัดยอดสต็อกสินค้าในหน้า Inventory เรียบร้อยแล้ว' : '📥 รับเข้าและเพิ่มยอดสต็อกในหน้า Inventory เรียบร้อยแล้ว'}
+            </h3>
+            <p className="text-xs font-mono text-slate-600 text-center max-w-lg">
+              {lastCommitType === 'OUT' 
+                ? 'ระบบได้ดำเนินการตัดลดยอดคงเหลือของสินค้าในหน้า Inventory พร้อมบันทึกประวัติ Transaction การเบิกออก/ส่งออก (OUT) เรียบร้อยแล้ว'
+                : 'ระบบได้บันทึกรับเข้าและเพิ่มจำนวนสต็อกของสินค้าในหน้า Inventory เรียบร้อยแล้ว'}
+            </p>
+            <div className="flex gap-3 mt-4">
+              <button 
+                onClick={() => setSuccess(false)}
+                className="px-8 py-3 bg-slate-900 text-white text-[10px] uppercase tracking-widest font-black active-neo-brutalism neo-brutalism-shadow"
+              >
+                อัปโหลดเอกสารอื่นต่อ
+              </button>
+            </div>
           </motion.div>
         )}
 
@@ -1145,16 +1234,20 @@ export default function FileProcessor() {
               </div>
             )}
 
-            <div className="max-h-[400px] overflow-y-auto p-4 bg-slate-50">
+            <div className="max-h-[420px] overflow-y-auto p-4 bg-slate-50">
               <table className="w-full text-left border-collapse bg-white border-2 border-slate-900">
-                <thead className="sticky top-0 bg-slate-900 text-white">
+                <thead className="sticky top-0 bg-slate-900 text-white z-10">
                   <tr>
-                    <th className="px-6 py-3 text-[10px] uppercase font-black tracking-widest">LN</th>
-                    <th className="px-6 py-3 text-[10px] uppercase font-black tracking-widest">Serial Number</th>
-                    <th className="px-6 py-3 text-[10px] uppercase font-black tracking-widest">Part Reference</th>
-                    <th className="px-6 py-3 text-[10px] uppercase font-black tracking-widest">IE No</th>
-                    <th className="px-6 py-3 text-[10px] uppercase font-black tracking-widest">IE LN</th>
-                    <th className="px-6 py-3 text-[10px] uppercase font-black tracking-widest text-right">Verification</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">LN</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">Serial Number</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">Part Reference</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-center">จำนวน (Qty)</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">
+                      {uploadType === 'OUT' ? 'ผลการตัดยอดในคลัง (Stock Deduction)' : 'ผลการรับเข้าคลัง (Restock Effect)'}
+                    </th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">IE No</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">IE LN</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-right">Verification</th>
                   </tr>
                 </thead>
                 <tbody className="text-[11px] font-mono divide-y border-slate-100">
@@ -1164,6 +1257,10 @@ export default function FileProcessor() {
                     const hasWarning = !!match;
                     const isPending = hasWarning && !resolution;
 
+                    const invMatch = getInventoryMatch(item);
+                    const itemQty = Number(item.qty) || 1;
+                    const matchQty = invMatch ? (Number(invMatch.qty) || 1) : 0;
+
                     return (
                       <React.Fragment key={idx}>
                         <tr className={cn(
@@ -1172,8 +1269,8 @@ export default function FileProcessor() {
                           resolution?.type === 'same' ? "bg-emerald-50/20 text-slate-900" : "",
                           resolution?.type === 'separate' ? "bg-blue-50/20 text-slate-900" : ""
                         )}>
-                          <td className="px-6 py-3 text-slate-400">{item.lineItem}</td>
-                          <td className="px-6 py-3 font-black text-slate-900">
+                          <td className="px-4 py-3 text-slate-400">{item.lineItem}</td>
+                          <td className="px-4 py-3 font-black text-slate-900">
                             {item.serialNo}
                             {resolution?.type === 'same' && (
                               <span className="block text-[8px] font-sans font-medium text-emerald-600">
@@ -1181,12 +1278,46 @@ export default function FileProcessor() {
                               </span>
                             )}
                           </td>
-                          <td className="px-6 py-3 text-slate-600">
+                          <td className="px-4 py-3 text-slate-600">
                             <strong>{item.partNo}</strong> / {item.description}
                           </td>
-                          <td className="px-6 py-3 text-blue-600 font-bold">{item.importEntryNo || '-'}</td>
-                          <td className="px-6 py-3 text-blue-600 font-bold">{item.importEntryLineNo || '-'}</td>
-                          <td className="px-6 py-3 text-right">
+                          <td className="px-4 py-3 text-center font-black text-slate-900">
+                            <span className="bg-slate-100 border border-slate-300 px-2 py-0.5 rounded-none">
+                              {itemQty} {item.uom || 'EA'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {uploadType === 'OUT' ? (
+                              invMatch ? (
+                                itemQty < matchQty ? (
+                                  <span className="inline-block bg-emerald-50 text-emerald-800 border border-emerald-300 px-2 py-0.5 font-sans font-bold text-[10px]">
+                                    ✂️ คลังมี {matchQty} → ตัดออก {itemQty} (เหลือ {matchQty - itemQty} {item.uom || 'EA'})
+                                  </span>
+                                ) : (
+                                  <span className="inline-block bg-rose-50 text-rose-800 border border-rose-300 px-2 py-0.5 font-sans font-bold text-[10px]">
+                                    ✂️ คลังมี {matchQty} → ตัดหมดสต็อก (เปลี่ยนสถานะเป็น OUT)
+                                  </span>
+                                )
+                              ) : (
+                                <span className="inline-block bg-slate-100 text-slate-600 px-2 py-0.5 font-sans text-[10px]">
+                                  📦 บันทึกเป็นรายการส่งออก (OUT)
+                                </span>
+                              )
+                            ) : (
+                              invMatch ? (
+                                <span className="inline-block bg-blue-50 text-blue-800 border border-blue-300 px-2 py-0.5 font-sans font-bold text-[10px]">
+                                  📥 คลังมี {matchQty} + รับเข้า {itemQty} → รวมเป็น {matchQty + itemQty} {item.uom || 'EA'}
+                                </span>
+                              ) : (
+                                <span className="inline-block bg-emerald-50 text-emerald-800 px-2 py-0.5 font-sans text-[10px]">
+                                  ✨ รับสินค้าใหม่เข้าคลัง (IN In-Base)
+                                </span>
+                              )
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-blue-600 font-bold">{item.importEntryNo || '-'}</td>
+                          <td className="px-4 py-3 text-blue-600 font-bold">{item.importEntryLineNo || '-'}</td>
+                          <td className="px-4 py-3 text-right">
                             {hasWarning ? (
                               isPending ? (
                                 <span className="bg-amber-100 text-amber-800 text-[9px] font-mono px-2.5 py-1 font-bold border-2 border-amber-600 uppercase animate-pulse">
@@ -1213,7 +1344,7 @@ export default function FileProcessor() {
                             isPending ? "bg-amber-50/20 border-amber-200" :
                             resolution?.type === 'same' ? "bg-emerald-50/10 border-emerald-100" : "bg-slate-50/30 border-slate-100"
                           )}>
-                            <td colSpan={6} className="p-4 px-8">
+                            <td colSpan={8} className="p-4 px-8">
                               <div className="border-2 border-slate-900 bg-white p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-3 font-sans">
                                 <div className="flex items-start gap-3">
                                   <div className={cn(
