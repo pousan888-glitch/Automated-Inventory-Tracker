@@ -28,7 +28,10 @@ import {
   RefreshCw,
   Plus,
   Minus,
-  Building2
+  Building2,
+  ExternalLink,
+  Eye,
+  ChevronRight
 } from 'lucide-react';
 import { 
   subscribeToInventory, 
@@ -50,12 +53,23 @@ import { cn } from '../lib/utils';
 import { HoldToConfirmButton } from './HoldToConfirmButton';
 import { auth } from '../lib/firebase';
 
-export function InventoryList() {
+interface InventoryListProps {
+  initialSegment?: string;
+  onClearInitialSegment?: () => void;
+}
+
+export function InventoryList({ initialSegment, onClearInitialSegment }: InventoryListProps = {}) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [selectedLocation, setSelectedLocation] = useState<string>('ALL');
-  const [selectedSegment, setSelectedSegment] = useState<string>('ALL');
+  const [selectedSegment, setSelectedSegment] = useState<string>(initialSegment || 'ALL');
+
+  useEffect(() => {
+    if (initialSegment) {
+      setSelectedSegment(initialSegment);
+    }
+  }, [initialSegment]);
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [tempItem, setTempItem] = useState<InventoryItem | null>(null);
@@ -288,7 +302,7 @@ export function InventoryList() {
 
     const matchesSegment =
       selectedSegment === 'ALL' ||
-      i.segment === selectedSegment;
+      (selectedSegment === 'ไม่ระบุแผนก (Unassigned)' ? !i.segment || i.segment.trim() === '' : i.segment === selectedSegment);
 
     return matchesSearch && matchesLocation && matchesSegment;
   });
@@ -502,10 +516,20 @@ export function InventoryList() {
             <div className="relative flex-1">
               <select
                 value={selectedSegment}
-                onChange={(e) => setSelectedSegment(e.target.value)}
+                onChange={(e) => {
+                  setSelectedSegment(e.target.value);
+                  if (onClearInitialSegment && e.target.value === 'ALL') {
+                    onClearInitialSegment();
+                  }
+                }}
                 className="appearance-none px-4 py-2 pr-10 bg-white border-2 border-slate-900 font-mono text-[10px] font-black uppercase focus:outline-none focus:border-blue-600 transition-colors w-full cursor-pointer h-[38px] rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
               >
                 <option value="ALL">★ เซกเมนต์ทั้งหมดในระบบ (SHOW ALL SEGMENTS)</option>
+                {selectedSegment !== 'ALL' && !uniqueSegments.includes(selectedSegment) && (
+                  <option value={selectedSegment}>
+                    {selectedSegment.toUpperCase()}
+                  </option>
+                )}
                 {uniqueSegments.map(seg => (
                   <option key={seg} value={seg}>
                     {seg.toUpperCase()}
@@ -519,7 +543,10 @@ export function InventoryList() {
             
             {selectedSegment !== 'ALL' && (
               <button
-                onClick={() => setSelectedSegment('ALL')}
+                onClick={() => {
+                  setSelectedSegment('ALL');
+                  if (onClearInitialSegment) onClearInitialSegment();
+                }}
                 className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border-2 border-slate-900 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
                 title="ล้างส่วนกรองเซกเมนต์"
               >
@@ -2497,12 +2524,17 @@ export function TransactionHistory() {
   );
 }
 
-export function Dashboard() {
+interface DashboardProps {
+  onNavigateToInventory?: (department: string) => void;
+}
+
+export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<TransactionLog | null>(null);
   const [showOnlyMine, setShowOnlyMine] = useState(false);
   const [deptSearch, setDeptSearch] = useState('');
+  const [quickViewDept, setQuickViewDept] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub1 = subscribeToInventory(setItems);
@@ -2728,16 +2760,32 @@ export function Dashboard() {
               return (
                 <div 
                   key={idx}
-                  className="bg-slate-50/90 border-2 border-slate-200 hover:border-slate-900 p-3.5 flex flex-col justify-between transition-all duration-150 hover:shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] group"
+                  onClick={() => setQuickViewDept(dept.name)}
+                  className="bg-slate-50/90 border-2 border-slate-200 hover:border-slate-900 p-3.5 flex flex-col justify-between transition-all duration-150 hover:shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] group cursor-pointer relative"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <span className="font-sans font-black text-xs text-slate-900 uppercase truncate" title={dept.name}>
                         {dept.name}
                       </span>
-                      <span className="text-[10px] font-mono font-black text-slate-700 bg-white border border-slate-300 px-1.5 py-0.5 shrink-0">
-                        {pct.toFixed(1)}%
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] font-mono font-black text-slate-700 bg-white border border-slate-300 px-1.5 py-0.5">
+                          {pct.toFixed(1)}%
+                        </span>
+                        {onNavigateToInventory && (
+                          <button
+                            type="button"
+                            title="ไปที่หน้าคลังสินค้า (Filter Inventory)"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onNavigateToInventory(dept.name);
+                            }}
+                            className="p-0.5 text-slate-400 hover:text-blue-700 hover:bg-blue-100 border border-transparent hover:border-blue-400 transition-colors"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 my-1">
@@ -2754,13 +2802,15 @@ export function Dashboard() {
                     {/* Visual Progress Bar */}
                     <div className="w-full bg-slate-200 h-2 overflow-hidden border border-slate-300">
                       <div 
-                        className="bg-blue-600 group-hover:bg-blue-700 h-full transition-all duration-500"
+                        className="bg-blue-600 group-hover:bg-blue-700 h-full transition-all duration-500" 
                         style={{ width: `${Math.max(pct, 3)}%` }}
                       />
                     </div>
                     <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
                       <span>{dept.count.toLocaleString()} รายการ (SKUs)</span>
-                      <span className="text-slate-400">จากทั้งหมด {grandTotalQty.toLocaleString()} ชิ้น</span>
+                      <span className="text-blue-700 font-bold group-hover:underline flex items-center gap-0.5">
+                        <Eye className="w-3 h-3" /> ดูข้อมูลแผนก
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -3039,10 +3089,11 @@ export function Dashboard() {
                     return (
                       <div 
                         key={index} 
-                        className="p-2.5 bg-slate-50/80 hover:bg-blue-50/50 border border-slate-300 hover:border-slate-900 flex flex-col gap-1.5 transition-all duration-150"
+                        onClick={() => setQuickViewDept(dept.name)}
+                        className="p-2.5 bg-slate-50/80 hover:bg-blue-50/70 border border-slate-300 hover:border-slate-900 flex flex-col gap-1.5 transition-all duration-150 cursor-pointer group"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-sans font-black text-[11px] text-slate-900 uppercase truncate" title={dept.name}>
+                          <span className="font-sans font-black text-[11px] text-slate-900 uppercase truncate group-hover:text-blue-900" title={dept.name}>
                             {dept.name}
                           </span>
                           <div className="flex items-baseline gap-1 shrink-0">
@@ -3065,8 +3116,8 @@ export function Dashboard() {
 
                         <div className="flex justify-between items-center text-[8.5px] font-mono text-slate-500 pt-0.5">
                           <span>{dept.count.toLocaleString()} รายการ (SKUs)</span>
-                          <span className="font-black text-slate-700 bg-white px-1 border border-slate-200">
-                            {pct.toFixed(1)}% ของคลัง
+                          <span className="font-black text-slate-700 bg-white px-1 border border-slate-200 group-hover:border-blue-400 group-hover:text-blue-700 flex items-center gap-0.5">
+                            <Eye className="w-2.5 h-2.5" /> ดูข้อมูล ({pct.toFixed(1)}%)
                           </span>
                         </div>
                       </div>
@@ -3244,6 +3295,155 @@ export function Dashboard() {
           </motion.div>
         </div>
       )}
+
+      {/* Department Quick-View Modal */}
+      {quickViewDept && (() => {
+        const deptItems = filteredItems.filter(i => {
+          const rawDept = (i.segment || '').trim();
+          const dept = rawDept || 'ไม่ระบุแผนก (Unassigned)';
+          return dept === quickViewDept;
+        });
+        const deptTotalQty = deptItems.reduce((acc, curr) => acc + (curr.qty !== undefined && Number(curr.qty) > 0 ? Number(curr.qty) : 1), 0);
+        const inItems = deptItems.filter(i => i.status === 'IN');
+        const inQty = inItems.reduce((acc, curr) => acc + (curr.qty !== undefined && Number(curr.qty) > 0 ? Number(curr.qty) : 1), 0);
+        const outItems = deptItems.filter(i => i.status === 'OUT');
+        const outQty = outItems.reduce((acc, curr) => acc + (curr.qty !== undefined && Number(curr.qty) > 0 ? Number(curr.qty) : 1), 0);
+
+        return (
+          <div className="fixed inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-3 sm:p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white border-2 border-slate-900 shadow-[8px_8px_0px_0px_rgba(15,23,42,1)] w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="p-4 sm:p-5 bg-slate-900 text-white flex justify-between items-start shrink-0 border-b-2 border-slate-900">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-blue-500 inline-block"></span>
+                    <span className="text-[10px] font-mono font-black text-blue-400 uppercase tracking-widest">
+                      DEPARTMENT QUICK VIEW • หน้าต่างสืบค้นด่วน
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-sans font-black tracking-tight uppercase flex items-center gap-2">
+                    แผนก: <span className="text-blue-400">{quickViewDept}</span>
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => setQuickViewDept(null)}
+                  className="p-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Summary Stats Row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-100 border-b-2 border-slate-300 text-xs font-mono">
+                <div className="bg-white p-2.5 border border-slate-300">
+                  <p className="text-[9px] font-bold text-slate-500 uppercase font-sans">จำนวนสินค้าทั้งหมด</p>
+                  <p className="text-xl font-black text-blue-700">{deptTotalQty.toLocaleString()} <span className="text-xs text-slate-600 font-sans">ชิ้น</span></p>
+                </div>
+                <div className="bg-white p-2.5 border border-slate-300">
+                  <p className="text-[9px] font-bold text-slate-500 uppercase font-sans">จำนวนรายการ (SKUs)</p>
+                  <p className="text-xl font-black text-slate-900">{deptItems.length.toLocaleString()} <span className="text-xs text-slate-600 font-sans">รายการ</span></p>
+                </div>
+                <div className="bg-white p-2.5 border border-slate-300">
+                  <p className="text-[9px] font-bold text-emerald-700 uppercase font-sans">คงคลัง (IN)</p>
+                  <p className="text-xl font-black text-emerald-600">{inQty.toLocaleString()} <span className="text-xs text-slate-600 font-sans">ชิ้น</span></p>
+                </div>
+                <div className="bg-white p-2.5 border border-slate-300">
+                  <p className="text-[9px] font-bold text-rose-700 uppercase font-sans">เบิกออก (OUT)</p>
+                  <p className="text-xl font-black text-rose-600">{outQty.toLocaleString()} <span className="text-xs text-slate-600 font-sans">ชิ้น</span></p>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {deptItems.length === 0 ? (
+                  <div className="py-12 text-center text-xs font-bold text-slate-400 uppercase italic">
+                    ไม่พบรายการสินค้าในแผนกนี้
+                  </div>
+                ) : (
+                  <div className="border border-slate-300 overflow-x-auto">
+                    <table className="w-full text-left border-collapse font-mono text-xs">
+                      <thead>
+                        <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider divide-x divide-slate-800">
+                          <th className="px-3 py-2">Serial No. / Tag</th>
+                          <th className="px-3 py-2">Part No.</th>
+                          <th className="px-3 py-2">Description</th>
+                          <th className="px-3 py-2">Location</th>
+                          <th className="px-3 py-2 text-right">Qty</th>
+                          <th className="px-3 py-2 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800">
+                        {deptItems.map((item, idx) => (
+                          <tr key={item.id || idx} className="hover:bg-blue-50/50 divide-x divide-slate-200">
+                            <td className="px-3 py-2 font-bold text-blue-700 whitespace-nowrap">
+                              {getDisplaySerial(item)}
+                            </td>
+                            <td className="px-3 py-2 font-bold whitespace-nowrap">
+                              {item.partNo || '-'}
+                            </td>
+                            <td className="px-3 py-2 max-w-xs truncate" title={item.description}>
+                              {item.description || '-'}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-slate-600">
+                              {item.location || '-'}
+                            </td>
+                            <td className="px-3 py-2 text-right font-black text-slate-900 whitespace-nowrap">
+                              {(item.qty || 1).toLocaleString()} {item.unit || 'ชิ้น'}
+                            </td>
+                            <td className="px-3 py-2 text-center whitespace-nowrap">
+                              <span className={`px-2 py-0.5 border text-[9px] font-extrabold leading-none tracking-tight uppercase ${
+                                item.status === 'IN' 
+                                  ? 'border-emerald-500 bg-emerald-50 text-emerald-800' 
+                                  : 'border-rose-500 bg-rose-50 text-rose-800'
+                              }`}>
+                                {item.status === 'IN' ? 'IN-STOCK' : 'OUT-OF-STOCK'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer with Action Buttons */}
+              <div className="p-4 bg-slate-50 border-t-2 border-slate-300 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+                <span className="text-[11px] font-mono text-slate-500">
+                  แสดงรายการสินค้าทั้งหมดของแผนก <strong className="text-slate-900">{quickViewDept}</strong> ({deptItems.length} รายการ)
+                </span>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button 
+                    onClick={() => setQuickViewDept(null)}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border-2 border-slate-300 text-xs font-bold uppercase transition-all cursor-pointer"
+                  >
+                    ปิดหน้าต่าง
+                  </button>
+                  {onNavigateToInventory && (
+                    <button 
+                      onClick={() => {
+                        const dept = quickViewDept;
+                        setQuickViewDept(null);
+                        onNavigateToInventory(dept);
+                      }}
+                      className="flex-1 sm:flex-none px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white border-2 border-slate-900 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+                    >
+                      <span>ไปที่หน้า Inventory เพื่อจัดการ</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+            </motion.div>
+          </div>
+        );
+      })()}
 
     </div>
   );

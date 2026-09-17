@@ -12,6 +12,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'history' | 'upload' | 'ai_chat' | 'settings'>('dashboard');
   const [user, setUser] = useState<User | null>(null);
   const [isQuickAiOpen, setIsQuickAiOpen] = useState(false);
+  const [selectedInventoryDepartment, setSelectedInventoryDepartment] = useState<string>('ALL');
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
@@ -19,12 +20,22 @@ export default function App() {
     });
   }, []);
 
+  const handleNavigateToInventory = (department: string) => {
+    setSelectedInventoryDepartment(department);
+    setActiveTab('inventory');
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard onNavigateToInventory={handleNavigateToInventory} />;
       case 'inventory':
-        return <InventoryList />;
+        return (
+          <InventoryList 
+            initialSegment={selectedInventoryDepartment} 
+            onClearInitialSegment={() => setSelectedInventoryDepartment('ALL')} 
+          />
+        );
       case 'history':
         return <TransactionHistory />;
       case 'upload':
@@ -38,7 +49,7 @@ export default function App() {
       case 'settings':
         return <SettingsView />;
       default:
-        return <Dashboard />;
+        return <Dashboard onNavigateToInventory={handleNavigateToInventory} />;
     }
   };
 
