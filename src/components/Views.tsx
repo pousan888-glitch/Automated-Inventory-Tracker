@@ -27,7 +27,8 @@ import {
   CheckCircle2,
   RefreshCw,
   Plus,
-  Minus
+  Minus,
+  Building2
 } from 'lucide-react';
 import { 
   subscribeToInventory, 
@@ -2501,6 +2502,7 @@ export function Dashboard() {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<TransactionLog | null>(null);
   const [showOnlyMine, setShowOnlyMine] = useState(false);
+  const [deptSearch, setDeptSearch] = useState('');
 
   useEffect(() => {
     const unsub1 = subscribeToInventory(setItems);
@@ -2577,23 +2579,26 @@ export function Dashboard() {
     }
   };
 
-  // Group items by Part Number from the complete list to compute accurate stock alerts
-  const baseStockMapping: { [part: string]: { partNo: string; desc: string; count: number } } = {};
-  filteredItems.forEach(i => {
-    if (i.partNo) {
-      if (!baseStockMapping[i.partNo]) {
-        baseStockMapping[i.partNo] = { partNo: i.partNo, desc: i.description || 'N/A', count: 0 };
+  // Group items by Department (Segment) to show piece count and item count per department
+  const departmentStats = React.useMemo(() => {
+    const map: { [dept: string]: { name: string; totalQty: number; count: number } } = {};
+    filteredItems.forEach(item => {
+      const rawDept = (item.segment || '').trim();
+      const dept = rawDept || 'ไม่ระบุแผนก (Unassigned)';
+      const qty = item.qty !== undefined && Number(item.qty) > 0 ? Number(item.qty) : 1;
+      
+      if (!map[dept]) {
+        map[dept] = { name: dept, totalQty: 0, count: 0 };
       }
-      if (i.status === 'IN') {
-        baseStockMapping[i.partNo].count++;
-      }
-    }
-  });
+      map[dept].totalQty += qty;
+      map[dept].count += 1;
+    });
+    return Object.values(map).sort((a, b) => b.totalQty - a.totalQty);
+  }, [filteredItems]);
 
-  const lowStockParts = Object.values(baseStockMapping)
-    .filter(p => p.count > 0 && p.count <= 10)
-    .sort((a,b) => a.count - b.count)
-    .slice(0, 3);
+  const grandTotalQty = React.useMemo(() => {
+    return departmentStats.reduce((sum, d) => sum + d.totalQty, 0);
+  }, [departmentStats]);
 
   // Math for donut chart (At Base vs Deployed)
   const totalCount = totalIn + totalOut;
@@ -2668,6 +2673,101 @@ export function Dashboard() {
             )}
           </div>
         ))}
+      </div>
+
+      {/* PROMINENT TOP PANEL: Department Breakdown (เห็นเด่นชัดทันทีด้านบน ไม่ต้องเลื่อนลง) */}
+      <div className="bg-white border-2 border-slate-900 p-5 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b-2 border-slate-900">
+          <div className="flex items-center gap-3">
+            <div className="p-2 border-2 border-slate-900 bg-blue-600 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-base font-black uppercase tracking-tight text-slate-900 font-sans">
+                  สรุปสต็อกแยกตามแผนก
+                </h4>
+                <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300 font-mono">
+                  {departmentStats.length} แผนก
+                </span>
+              </div>
+              <p className="text-[11px] font-mono text-slate-500 uppercase tracking-tight">
+                DEPARTMENT INVENTORY BREAKDOWN
+              </p>
+            </div>
+          </div>
+
+          {/* Grand Total Highlight Badge */}
+          <div className="flex items-center gap-3 bg-slate-900 text-white px-4 py-2 border border-slate-900 shadow-[2px_2px_0px_0px_rgba(59,130,246,1)]">
+            <span className="text-[11px] font-mono uppercase text-slate-300 tracking-wider">
+              ยอดคงคลังรวมทุกแผนก:
+            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black font-mono text-emerald-400">
+                {grandTotalQty.toLocaleString()}
+              </span>
+              <span className="text-xs font-bold text-slate-300 font-sans uppercase">
+                ชิ้น
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono ml-1">
+                ({filteredItems.length} รายการ)
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Department Grid: View all departments immediately without scrolling */}
+        {departmentStats.length === 0 ? (
+          <div className="py-8 text-center text-xs font-bold font-sans text-slate-400 uppercase italic">
+            ไม่พบข้อมูลสินค้าคงคลังในระบบ
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 pt-4">
+            {departmentStats.map((dept, idx) => {
+              const pct = grandTotalQty > 0 ? (dept.totalQty / grandTotalQty) * 100 : 0;
+              return (
+                <div 
+                  key={idx}
+                  className="bg-slate-50/90 border-2 border-slate-200 hover:border-slate-900 p-3.5 flex flex-col justify-between transition-all duration-150 hover:shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] group"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className="font-sans font-black text-xs text-slate-900 uppercase truncate" title={dept.name}>
+                        {dept.name}
+                      </span>
+                      <span className="text-[10px] font-mono font-black text-slate-700 bg-white border border-slate-300 px-1.5 py-0.5 shrink-0">
+                        {pct.toFixed(1)}%
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline gap-1.5 my-1">
+                      <span className="text-2xl font-black font-mono text-blue-700 group-hover:text-blue-900 transition-colors">
+                        {dept.totalQty.toLocaleString()}
+                      </span>
+                      <span className="text-[11px] font-black text-slate-600 font-sans uppercase">
+                        ชิ้น
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 pt-2">
+                    {/* Visual Progress Bar */}
+                    <div className="w-full bg-slate-200 h-2 overflow-hidden border border-slate-300">
+                      <div 
+                        className="bg-blue-600 group-hover:bg-blue-700 h-full transition-all duration-500"
+                        style={{ width: `${Math.max(pct, 3)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
+                      <span>{dept.count.toLocaleString()} รายการ (SKUs)</span>
+                      <span className="text-slate-400">จากทั้งหมด {grandTotalQty.toLocaleString()} ชิ้น</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Main split grid: Left Asset Management Table, Right Side Dashboard Panel */}
@@ -2883,42 +2983,107 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Card 3: STOCK LEVEL ALERTS */}
+          {/* Card 3: DEPARTMENT INVENTORY (แยกตามแผนก / Segment) */}
           <div className="bg-white border-2 border-slate-900 p-5 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] space-y-3">
-            <div className="border-b border-slate-200 pb-1.5">
-              <h4 className="text-[10.5px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 bg-[#ef4444] inline-block rounded-full"></span>
-                STOCK LEVEL ALERTS
-              </h4>
+            <div className="border-b border-slate-200 pb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1 border border-slate-950 bg-blue-50 text-blue-700">
+                  <Building2 className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-[10.5px] font-black uppercase tracking-wider text-slate-900 leading-tight">
+                    สต็อกแยกตามแผนก
+                  </h4>
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                    DEPARTMENT BREAKDOWN
+                  </span>
+                </div>
+              </div>
+              <span className="text-[9px] font-mono font-black text-blue-800 bg-blue-50 border border-blue-200 px-1.5 py-0.5 shadow-sm">
+                {departmentStats.length} แผนก
+              </span>
             </div>
 
-            <div className="space-y-3 pt-1">
-              {lowStockParts.length === 0 ? (
-                <div className="p-4 bg-emerald-50 border border-emerald-300 text-[9.5px] font-bold text-emerald-800 uppercase text-center rounded-none font-sans">
-                  ✔ ทุกชิ้นส่วนมีสินค้าพอใช้งาน (Critical stock okay)
+            {/* Department search filter if more than 3 departments */}
+            {departmentStats.length > 3 && (
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="ค้นหาแผนก..."
+                  value={deptSearch}
+                  onChange={(e) => setDeptSearch(e.target.value)}
+                  className="w-full text-[10px] pl-6 pr-5 py-1 bg-slate-50 border border-slate-300 focus:outline-none focus:border-blue-600 font-sans placeholder:text-slate-400"
+                />
+                <Search className="w-3 h-3 text-slate-400 absolute left-2 top-2" />
+                {deptSearch && (
+                  <button 
+                    onClick={() => setDeptSearch('')}
+                    className="absolute right-2 top-1 text-slate-400 hover:text-slate-700 text-xs font-bold"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2 pt-0.5 max-h-[360px] overflow-y-auto pr-1">
+              {departmentStats.length === 0 ? (
+                <div className="p-5 bg-slate-50 border border-slate-200 text-[9.5px] font-bold text-slate-400 uppercase text-center rounded-none font-sans">
+                  ไม่พบข้อมูลสินค้าคงคลังในระบบ
                 </div>
               ) : (
-                lowStockParts.map((part, index) => (
-                  <div key={index} className="p-3 bg-amber-50/70 border border-slate-400 flex flex-col gap-1.5 rounded-none">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono font-black text-[10px] text-slate-900 uppercase">
-                        {part.partNo}
-                      </span>
-                      <span className="text-[8px] font-black font-sans uppercase bg-amber-500 text-white px-1.5 py-0.5 border border-slate-950 leading-none">
-                        NEED RE-ORDER
-                      </span>
-                    </div>
-                    <span className="text-[9px] font-bold text-slate-500 line-clamp-1 uppercase">
-                      {part.desc}
-                    </span>
-                    <div className="flex justify-between items-center text-[8.5px] font-mono font-bold text-amber-800 uppercase border-t border-slate-200/50 pt-1 mt-0.5">
-                      <span>STOCK AT BASE:</span>
-                      <span className="font-black text-[10.5px]">{part.count} UNITS</span>
-                    </div>
-                  </div>
-                ))
+                departmentStats
+                  .filter(d => !deptSearch || d.name.toLowerCase().includes(deptSearch.toLowerCase()))
+                  .map((dept, index) => {
+                    const pct = grandTotalQty > 0 ? (dept.totalQty / grandTotalQty) * 100 : 0;
+                    return (
+                      <div 
+                        key={index} 
+                        className="p-2.5 bg-slate-50/80 hover:bg-blue-50/50 border border-slate-300 hover:border-slate-900 flex flex-col gap-1.5 transition-all duration-150"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-sans font-black text-[11px] text-slate-900 uppercase truncate" title={dept.name}>
+                            {dept.name}
+                          </span>
+                          <div className="flex items-baseline gap-1 shrink-0">
+                            <span className="font-mono font-black text-[13px] text-blue-700">
+                              {dept.totalQty.toLocaleString()}
+                            </span>
+                            <span className="text-[9px] font-black text-slate-600 font-sans uppercase">
+                              ชิ้น
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="w-full bg-slate-200 h-1.5 overflow-hidden border border-slate-300">
+                          <div 
+                            className="bg-blue-600 h-full transition-all duration-500" 
+                            style={{ width: `${Math.max(pct, 2)}%` }}
+                          />
+                        </div>
+
+                        <div className="flex justify-between items-center text-[8.5px] font-mono text-slate-500 pt-0.5">
+                          <span>{dept.count.toLocaleString()} รายการ (SKUs)</span>
+                          <span className="font-black text-slate-700 bg-white px-1 border border-slate-200">
+                            {pct.toFixed(1)}% ของคลัง
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
               )}
             </div>
+
+            {/* Bottom Total Footer */}
+            {departmentStats.length > 0 && (
+              <div className="pt-2 border-t-2 border-slate-900 flex items-center justify-between text-[9.5px] font-mono font-bold text-slate-700 bg-slate-100 px-2.5 py-1.5">
+                <span>ยอดรวมสต็อกทั้งหมด:</span>
+                <span className="text-blue-700 font-black text-[11px]">
+                  {grandTotalQty.toLocaleString()} ชิ้น ({filteredItems.length} รายการ)
+                </span>
+              </div>
+            )}
           </div>
 
         </div>

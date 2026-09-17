@@ -1,21 +1,30 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const serverDir = process.cwd();
+let aiClient: GoogleGenAI | null = null;
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
+function getGenAI(): GoogleGenAI {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('ไม่พบค่าตัวแปรสภาพแวดล้อม GEMINI_API_KEY บนเซิร์ฟเวอร์ กรุณาตรวจสอบการตั้งค่า Secrets');
+    }
+    aiClient = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+  }
+  return aiClient;
+}
 
 async function startServer() {
   const app = express();
@@ -109,12 +118,16 @@ Your job is to:
         parts: [{ text: userPrompt }],
       });
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
+      const genAI = getGenAI();
+      const response = await genAI.models.generateContent({
+        model: 'gemini-3.8-flash',
         contents,
         config: {
           systemInstruction,
           temperature: 0.2,
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.LOW,
+          },
         },
       });
 

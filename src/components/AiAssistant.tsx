@@ -189,9 +189,42 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
     setAttachedFile(null);
     setIsLoading(true);
 
+    // Extract search keywords from prompt to prioritize matching items
+    const rawTokens = promptToSend.toLowerCase().split(/[\s,;:|/\\_-]+/).filter(t => t.length >= 2);
+    
+    // Find matching items from local inventory database
+    const matchingLocalItems = inventoryItems.filter(item => {
+      const pNo = (item.partNo || '').toLowerCase();
+      const sNo = (item.serialNo || '').toLowerCase();
+      const desc = (item.description || '').toLowerCase();
+      const loc = (item.currentLocation || '').toLowerCase();
+      const inv = (item.invoiceNo || '').toLowerCase();
+      return rawTokens.some(tok => pNo.includes(tok) || sNo.includes(tok) || desc.includes(tok) || loc.includes(tok) || inv.includes(tok));
+    });
+
+    // Sort items: matching items first, then others, capped to 400 items
+    const nonMatching = inventoryItems.filter(item => !matchingLocalItems.includes(item));
+    const prioritizedList = [...matchingLocalItems, ...nonMatching].slice(0, 400);
+
+    const compactItems = prioritizedList.map(item => ({
+      partNo: item.partNo || '',
+      serialNo: getDisplaySerial(item.serialNo),
+      description: item.description || '',
+      qty: item.qty !== undefined ? item.qty : 1,
+      uom: item.uom || 'EA',
+      status: item.status || 'IN',
+      currentLocation: item.currentLocation || 'In-Base',
+      segment: item.segment || '',
+      customsStatus: item.customsStatus || '',
+      invoiceNo: item.invoiceNo || '',
+    }));
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 40000); // 40 seconds timeout
+
     try {
       // Build lightweight history
-      const historyPayload = messages.slice(-8).map((m) => ({
+      const historyPayload = messages.slice(-6).map((m) => ({
         role: m.role,
         content: m.content,
       }));
@@ -199,11 +232,12 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           message: promptToSend,
           history: historyPayload,
           inventorySummary: summary,
-          inventoryItems: inventoryItems.slice(0, 300), // send snapshot to ground answer
+          inventoryItems: compactItems,
           attachedFile: currentAttachedFile ? {
             name: currentAttachedFile.name,
             type: currentAttachedFile.type,
@@ -212,26 +246,60 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
         }),
       });
 
-      const data = await res.json();
+      clearTimeout(timeoutId);
 
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Server responded with error');
+      const responseText = await res.text();
+      let data: any = null;
+
+      try {
+        data = JSON.parse(responseText);
+      } catch (_jsonErr) {
+        if (!res.ok) {
+          if (res.status === 502 || res.status === 504) {
+            throw new Error(`เซิร์ฟเวอร์ตอบสนองล่าช้า (HTTP ${res.status}) กำลังเริ่มต้นใหม่อีกครั้ง กรุณากดส่งใหม่อีกครั้งใน 2-3 วินาที`);
+          }
+          if (res.status === 503) {
+            throw new Error('ระบบ AI กำลังเตรียมพร้อม (HTTP 503) กรุณารอสักครู่แล้วลองใหม่อีกครั้ง');
+          }
+          throw new Error(`เซิร์ฟเวอร์ตอบกลับรหัสข้อผิดพลาด HTTP ${res.status}`);
+        }
+        throw new Error('ไม่สามารถแปลงข้อมูลตอบกลับจากเซิร์ฟเวอร์เป็น JSON ได้');
+      }
+
+      if (!res.ok || data?.error) {
+        throw new Error(data?.error || `เซิร์ฟเวอร์ส่งรหัสข้อผิดพลาด (${res.status})`);
       }
 
       const modelMessage: ChatMessage = {
         id: 'model_' + Date.now(),
         role: 'model',
-        content: data.reply || 'ขออภัย ไม่สามารถประมวลผลคำตอบได้',
+        content: data.reply || 'ขออภัย ไม่พบข้อมูลตอบกลับจากระบบ AI',
         timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, modelMessage]);
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error('Chat error:', error);
+      
+      let errorDesc = error?.message || 'ไม่สามารถติดต่อ AI Server ได้';
+      if (error?.name === 'AbortError') {
+        errorDesc = 'คำขอหมดเวลา (Timeout) เนื่องจากระบบใช้เวลาประมวลผลนานเกินกำหนด กรุณาลองใหม่อีกครั้ง';
+      }
+
+      // If we have local matches from the 939 items, provide immediate useful answer to the user!
+      let localFallbackText = '';
+      if (matchingLocalItems.length > 0) {
+        localFallbackText = `\n\n---\n🔍 **ค้นหาด่วนจากฐานข้อมูลคลังปัจจุบัน (${inventoryItems.length} รายการ) พบสินค้าที่ตรงกับคำถาม:**\n` +
+          matchingLocalItems.slice(0, 5).map(item => (
+            `* **Part:** \`${item.partNo || '-'}\` | **SN:** \`${getDisplaySerial(item.serialNo)}\` | **สถานะ:** **${item.status || 'IN'}** | **จำนวน:** **${item.qty !== undefined ? item.qty : 1} ${item.uom || 'EA'}** | **Location:** ${item.currentLocation || 'In-Base'}\n  *รายละเอียด: ${item.description || '-'}${item.invoiceNo ? ` | Inv: ${item.invoiceNo}` : ''}*`
+          )).join('\n');
+      }
+
       const errorMessage: ChatMessage = {
         id: 'err_' + Date.now(),
         role: 'model',
-        content: `⚠️ เกิดข้อผิดพลาด: ${error?.message || 'ไม่สามารถติดต่อ AI Server ได้'}\n\n*กรุณาตรวจสอบว่าการเชื่อมต่ออินเทอร์เน็ตเสถียร หรือตั้งค่า API Key ครบถ้วน*`,
+        content: `⚠️ เกิดข้อผิดพลาด: ${errorDesc}${localFallbackText}\n\n*💡 คำแนะนำ: หากเซิร์ฟเวอร์เพิ่งตื่นหรือกำลังประมวลผล กรุณาลองกดส่งคำถามนี้ใหม่อีกครั้ง*`,
         timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMessage]);
