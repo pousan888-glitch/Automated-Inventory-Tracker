@@ -169,6 +169,91 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
     setPastedRawText('');
   };
 
+  // Local Intelligent Fallback Answer Engine for when external AI API returns 404 or fails
+  const generateLocalFallbackAnswer = (
+    prompt: string,
+    items: InventoryItem[],
+    currSummary: typeof summary,
+    attached?: AttachedFileData | null
+  ): string => {
+    const p = (prompt || '').toLowerCase();
+
+    // 1. Low Stock Query (สินค้าใกล้หมด / ตรวจสอบสินค้าที่มีจำนวนคงเหลือน้อย)
+    if (p.includes('น้อย') || p.includes('low') || p.includes('ใกล้หมด') || p.includes('ขาด') || p.includes('เติม') || p.includes('จัดเตรียม')) {
+      const lowStockItems = items.filter(i => (i.status === 'IN' || !i.status) && (Number(i.qty) || 1) <= 2);
+      if (lowStockItems.length === 0) {
+        return `### 📦 ตรวจสอบรายการสินค้าคงเหลือน้อย (Low Stock)\n\nปัจจุบันในคลังสินค้ามีทั้งหมด **${currSummary.totalItems} รายการ** และ **ไม่พบรายการสินค้าที่คงเหลือต่ำกว่าหรือเท่ากับ 2 ชิ้น** ทุกรายการมีระดับสต็อกพร้อมใช้งานครับ`;
+      }
+
+      const sample = lowStockItems.slice(0, 15);
+      const tableRows = sample.map((item, idx) => 
+        `| ${idx + 1} | \`${item.partNo || '-'}\` | \`${getDisplaySerial(item.serialNo)}\` | ${item.description.slice(0, 30)} | **${item.qty !== undefined ? item.qty : 1} ${item.uom || 'EA'}** | ${item.currentLocation || 'In-Base'} | ${item.segment || '-'} |`
+      ).join('\n');
+
+      return `### 📦 ตรวจสอบรายการสินค้าคงเหลือน้อย (Low Stock)\n\nพบสินค้าที่มีจำนวนคงเหลือน้อย (≤ 2 หน่วย) ทั้งหมด **${lowStockItems.length} รายการ** จากฐานข้อมูลสินค้าคงคลังปัจจุบัน:\n\n| # | Part No. | Serial No. | รายละเอียด | จำนวนคงเหลือ | สถานที่จัดเก็บ | แผนก |\n|---|---|---|---|---|---|---|\n${tableRows}\n${lowStockItems.length > 15 ? `\n*(และยังมีอีก ${lowStockItems.length - 15} รายการในระบบ)*\n` : ''}\n\n#### 💡 ข้อแนะนำในการจัดเตรียมและบริหารจัดการ:\n1. **เร่งตรวจสอบยอดสั่งซื้อ (PR/PO):** ควรประสานงานกับฝ่ายจัดซื้อหรือแผนกที่เกี่ยวข้อง (${Array.from(new Set(lowStockItems.map(i => i.segment).filter(Boolean))).slice(0, 4).join(', ') || 'ผู้ดูแลระบบ'}) สำหรับอะไหล่สำคัญ\n2. **ตรวจสอบ Physical Stock:** ยืนยันการมีอยู่จริงของ Serial No. ตามสถานที่ระบุข้างต้นก่อนทำรายการเบิกออกใหม่\n3. **ติดตามสินค้าที่กำลังนำเข้า:** ตรวจสอบกับใบขนสินค้าขาเข้า (Import Entry) ว่ามี Shipment สำหรับพาร์ทเหล่านี้กำลังเดินทางมาหรือไม่`;
+    }
+
+    // 2. Location breakdown (สรุปตาม Location)
+    if (p.includes('location') || p.includes('สถานที่') || p.includes('คลัง') || p.includes('yard') || p.includes('base') || p.includes('rig')) {
+      const locMap: { [loc: string]: { count: number; qty: number } } = {};
+      items.forEach(i => {
+        const loc = i.currentLocation || 'In-Base';
+        if (!locMap[loc]) locMap[loc] = { count: 0, qty: 0 };
+        locMap[loc].count += 1;
+        locMap[loc].qty += (Number(i.qty) || 1);
+      });
+
+      const rows = Object.entries(locMap)
+        .sort((a, b) => b[1].count - a[1].count)
+        .map(([loc, data], idx) => `| ${idx + 1} | 📍 **${loc}** | **${data.count}** รายการ | **${data.qty.toLocaleString()}** หน่วย |`).join('\n');
+
+      return `### 📍 สรุปรายการสินค้าคงคลังตามสถานที่จัดเก็บ (Location Breakdown)\n\nระบบตรวจพบสถานที่จัดเก็บทั้งหมด **${Object.keys(locMap).length} จุด** ในคลังสินค้า:\n\n| # | สถานที่จัดเก็บ | จำนวนรายการ (SKU) | ปริมาณรวม (Total Qty) |\n|---|---|---|---|\n${rows}\n\n**ยอดรวมสินค้าในคลังทั้งหมด:** ${currSummary.totalItems} รายการ (${currSummary.totalQty.toLocaleString()} หน่วย)`;
+    }
+
+    // 3. Segment / Department breakdown (สรุปตาม แผนก)
+    if (p.includes('แผนก') || p.includes('segment') || p.includes('ฝ่าย') || p.includes('กลุ่ม')) {
+      const segMap: { [seg: string]: { count: number; qty: number } } = {};
+      items.forEach(i => {
+        const seg = i.segment || 'ไม่ระบุแผนก (Unassigned)';
+        if (!segMap[seg]) segMap[seg] = { count: 0, qty: 0 };
+        segMap[seg].count += 1;
+        segMap[seg].qty += (Number(i.qty) || 1);
+      });
+
+      const rows = Object.entries(segMap)
+        .sort((a, b) => b[1].count - a[1].count)
+        .map(([seg, data], idx) => `| ${idx + 1} | 🏢 **${seg}** | **${data.count}** รายการ | **${data.qty.toLocaleString()}** หน่วย |`).join('\n');
+
+      return `### 🏢 สรุปรายการสินค้าคงคลังตามแผนก (Department / Segment Breakdown)\n\n| # | แผนก / Segment | จำนวนรายการ (Items) | ปริมาณรวม (Total Qty) |\n|---|---|---|---|\n${rows}`;
+    }
+
+    // 4. Specific Part No or Serial No search
+    const tokens = p.split(/[\s,;:|/\\_]+/).filter(t => t.length >= 2);
+    const matched = items.filter(item => {
+      const pNo = (item.partNo || '').toLowerCase();
+      const sNo = (item.serialNo || '').toLowerCase();
+      const desc = (item.description || '').toLowerCase();
+      const inv = (item.invoiceNo || '').toLowerCase();
+      return tokens.some(tok => pNo.includes(tok) || sNo.includes(tok) || desc.includes(tok) || inv.includes(tok));
+    });
+
+    if (matched.length > 0) {
+      const rows = matched.slice(0, 10).map((item, idx) => 
+        `| ${idx + 1} | \`${item.partNo || '-'}\` | \`${getDisplaySerial(item.serialNo)}\` | ${item.description.slice(0, 35)} | **${item.qty !== undefined ? item.qty : 1} ${item.uom || 'EA'}** | ${item.status || 'IN'} | ${item.currentLocation || 'In-Base'} | ${item.invoiceNo || '-'} |`
+      ).join('\n');
+
+      return `### 🔍 ผลการค้นหาข้อมูลสต็อกสินค้า\n\nพบสินค้าที่ตรงกับคำถามของคุณทั้งหมด **${matched.length} รายการ**:\n\n| # | Part No. | Serial No. | รายละเอียด | จำนวน | สถานะ | สถานที่จัดเก็บ | Invoice |\n|---|---|---|---|---|---|---|---|\n${rows}\n${matched.length > 10 ? `\n*(และยังมีอีก ${matched.length - 10} รายการ)*\n` : ''}`;
+    }
+
+    // 5. Attached file cross reference if available
+    if (attached && attached.content) {
+      return `### 📑 ผลการวิเคราะห์ไฟล์ "${attached.name}"\n\n- **ประเภทไฟล์:** ${attached.type}\n- **จำนวนแถวในเอกสาร:** ประมาณ ${attached.rowCount || '-'} แถว\n- **การตรวจสอบกับคลัง:** ฐานข้อมูลคลังมีสินค้าคงเหลือพร้อมใช้งานรวม **${currSummary.totalItems} รายการ**\n\n💡 *ระบบได้เตรียมข้อมูลเอกสารไว้พร้อมแล้ว สำหรับการ Cross-reference เชิงลึก กรุณาตั้งค่า \`GEMINI_API_KEY\` เพื่อเปิดใช้งานโมเดลวิเคราะห์เอกสารเต็มรูปแบบครับ*`;
+    }
+
+    // 6. General Inventory Summary
+    return `### 📊 ภาพรวมระบบสินค้าคงคลัง (Inventory Summary)\n\n* **จำนวนรายการทั้งหมดในฐานข้อมูล:** **${currSummary.totalItems}** รายการ\n* **สินค้าสถานะอยู่ในคลัง (IN):** **${currSummary.inCount}** รายการ\n* **สินค้าเบิกออก/ส่งออก (OUT):** **${currSummary.outCount}** รายการ\n* **ปริมาณคงคลังรวม (Total Quantity):** **${currSummary.totalQty.toLocaleString()}** หน่วย\n* **สินค้าที่มีจำนวนคงเหลือน้อย (≤ 2 ชิ้น):** **${currSummary.lowStockCount}** รายการ\n* **สถานที่จัดเก็บหลัก:** ${currSummary.locations.slice(0, 5).join(', ') || 'In-Base'}\n\n💡 *คุณสามารถสอบถาม Part No., Serial No., ค้นหาสินค้าตาม Location หรือลากไฟล์เอกสารมาเปรียบเทียบได้เลยครับ*`;
+  };
+
   // Submit message to AI
   const handleSendMessage = async (customPrompt?: string) => {
     const promptToSend = (customPrompt || inputQuery).trim();
@@ -255,6 +340,18 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
         data = JSON.parse(responseText);
       } catch (_jsonErr) {
         if (!res.ok) {
+          if (res.status === 404) {
+            // Local Intelligent Fallback for 404
+            const localReply = generateLocalFallbackAnswer(promptToSend, inventoryItems, summary, currentAttachedFile);
+            const modelMessage: ChatMessage = {
+              id: 'model_' + Date.now(),
+              role: 'model',
+              content: `${localReply}\n\n---\n> ℹ️ *คำตอบนี้ได้รับการประมวลผลอัตโนมัติจากฐานข้อมูลคลังปัจจุบัน (${inventoryItems.length} รายการ) เนื่องจากเซิร์ฟเวอร์ AI ภายนอกตอบกลับรหัส HTTP 404 (หากเปิดบน Vercel กรุณาตรวจสอบว่าได้ตั้งค่าตัวแปร \`GEMINI_API_KEY\` ใน Vercel Settings > Environment Variables เรียบร้อยแล้ว)*`,
+              timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+            };
+            setMessages((prev) => [...prev, modelMessage]);
+            return;
+          }
           if (res.status === 502 || res.status === 504) {
             throw new Error(`เซิร์ฟเวอร์ตอบสนองล่าช้า (HTTP ${res.status}) กำลังเริ่มต้นใหม่อีกครั้ง กรุณากดส่งใหม่อีกครั้งใน 2-3 วินาที`);
           }
@@ -267,6 +364,17 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
       }
 
       if (!res.ok || data?.error) {
+        if (res.status === 404) {
+          const localReply = generateLocalFallbackAnswer(promptToSend, inventoryItems, summary, currentAttachedFile);
+          const modelMessage: ChatMessage = {
+            id: 'model_' + Date.now(),
+            role: 'model',
+            content: `${localReply}\n\n---\n> ℹ️ *คำตอบนี้ได้รับการประมวลผลอัตโนมัติจากฐานข้อมูลคลังปัจจุบัน (${inventoryItems.length} รายการ) เนื่องจากเซิร์ฟเวอร์ตอบกลับรหัส HTTP 404*`,
+            timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages((prev) => [...prev, modelMessage]);
+          return;
+        }
         throw new Error(data?.error || `เซิร์ฟเวอร์ส่งรหัสข้อผิดพลาด (${res.status})`);
       }
 
@@ -287,19 +395,13 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
         errorDesc = 'คำขอหมดเวลา (Timeout) เนื่องจากระบบใช้เวลาประมวลผลนานเกินกำหนด กรุณาลองใหม่อีกครั้ง';
       }
 
-      // If we have local matches from the 939 items, provide immediate useful answer to the user!
-      let localFallbackText = '';
-      if (matchingLocalItems.length > 0) {
-        localFallbackText = `\n\n---\n🔍 **ค้นหาด่วนจากฐานข้อมูลคลังปัจจุบัน (${inventoryItems.length} รายการ) พบสินค้าที่ตรงกับคำถาม:**\n` +
-          matchingLocalItems.slice(0, 5).map(item => (
-            `* **Part:** \`${item.partNo || '-'}\` | **SN:** \`${getDisplaySerial(item.serialNo)}\` | **สถานะ:** **${item.status || 'IN'}** | **จำนวน:** **${item.qty !== undefined ? item.qty : 1} ${item.uom || 'EA'}** | **Location:** ${item.currentLocation || 'In-Base'}\n  *รายละเอียด: ${item.description || '-'}${item.invoiceNo ? ` | Inv: ${item.invoiceNo}` : ''}*`
-          )).join('\n');
-      }
+      // If network error occurred, still provide local inventory answer!
+      const localReply = generateLocalFallbackAnswer(promptToSend, inventoryItems, summary, currentAttachedFile);
 
       const errorMessage: ChatMessage = {
         id: 'err_' + Date.now(),
         role: 'model',
-        content: `⚠️ เกิดข้อผิดพลาด: ${errorDesc}${localFallbackText}\n\n*💡 คำแนะนำ: หากเซิร์ฟเวอร์เพิ่งตื่นหรือกำลังประมวลผล กรุณาลองกดส่งคำถามนี้ใหม่อีกครั้ง*`,
+        content: `${localReply}\n\n---\n⚠️ *หมายเหตุ: ${errorDesc} ระบบจึงสลับมาใช้การประมวลผลจากฐานข้อมูลในเครื่องให้โดยอัตโนมัติ*`,
         timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMessage]);

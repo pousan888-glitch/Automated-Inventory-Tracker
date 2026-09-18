@@ -31,7 +31,8 @@ import {
   Building2,
   ExternalLink,
   Eye,
-  ChevronRight
+  ChevronRight,
+  Copy
 } from 'lucide-react';
 import { 
   subscribeToInventory, 
@@ -61,7 +62,13 @@ interface InventoryListProps {
 export function InventoryList({ initialSegment, onClearInitialSegment }: InventoryListProps = {}) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+  // Default to 'grid' (กรอบเล็ก) on mobile screens (< 768px) so users don't have to scroll horizontally
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'grid';
+    }
+    return 'table';
+  });
   const [selectedLocation, setSelectedLocation] = useState<string>('ALL');
   const [selectedSegment, setSelectedSegment] = useState<string>(initialSegment || 'ALL');
 
@@ -437,24 +444,29 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
           />
         </div>
 
-        <div className="flex items-center gap-4 self-end sm:sm:self-auto">
-          <div className="flex items-center gap-2 border-2 border-slate-900 bg-white p-1 neo-brutalism-shadow">
+        <div className="flex items-center gap-4 self-end sm:self-auto">
+          <div className="flex items-center gap-1.5 border-2 border-slate-900 bg-white p-1 neo-brutalism-shadow">
             <button 
               onClick={() => setViewMode('grid')}
               className={cn(
-                "px-3 py-1.5 text-[9px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors",
+                "px-2.5 sm:px-3 py-1.5 text-[9px] sm:text-[9.5px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer",
                 viewMode === 'grid' ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100"
               )}
+              title="มุมมองกรอบเล็ก (เหมาะสำหรับเปิดบนมือถือ ไม่ต้องสไลด์ข้าง)"
             >
               <LayoutGrid className="w-3.5 h-3.5" />
               <span>กรอบเล็ก</span>
+              <span className="md:hidden text-[7.5px] px-1 py-0.2 bg-amber-400 text-slate-950 font-mono font-black">
+                แนะนำ
+              </span>
             </button>
             <button 
               onClick={() => setViewMode('table')}
               className={cn(
-                "px-3 py-1.5 text-[9px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors",
+                "px-2.5 sm:px-3 py-1.5 text-[9px] sm:text-[9.5px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer",
                 viewMode === 'table' ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100"
               )}
+              title="มุมมองตาราง"
             >
               <List className="w-3.5 h-3.5" />
               <span>ตาราง</span>
@@ -639,7 +651,21 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
 
       <div className="bg-white border-2 border-slate-900 neo-brutalism-shadow overflow-hidden">
         {viewMode === 'table' ? (
-          <div className="overflow-x-auto">
+          <div>
+            {/* Mobile notification for table mode with 1-click switch to grid */}
+            <div className="md:hidden bg-amber-100 border-b-2 border-slate-900 p-2.5 px-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-[9.5px] font-bold text-slate-900">
+                <span>📱 กำลังแสดงแบบตาราง (สไลด์ข้างเพื่อดูข้อมูล)</span>
+              </div>
+              <button
+                onClick={() => setViewMode('grid')}
+                className="px-2.5 py-1 bg-slate-900 text-white font-black text-[9px] uppercase tracking-wider flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+              >
+                <LayoutGrid className="w-3 h-3 text-amber-400" />
+                <span>เปลี่ยนเป็นกรอบเล็ก</span>
+              </button>
+            </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-900 text-white border-b-2 border-slate-900">
@@ -841,33 +867,34 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
               </tbody>
             </table>
           </div>
+        </div>
         ) : (
-          /* Small Boxes (กรอบเล็กๆ) Grid view */
-          <div className="p-6">
+          /* Small Boxes (กรอบเล็กๆ) Grid view - Optimized for Mobile */
+          <div className="p-3 sm:p-4 md:p-6">
             {filtered.length === 0 ? (
-              <div className="p-24 text-center">
+              <div className="p-16 sm:p-24 text-center">
                 <div className="flex flex-col items-center gap-2 opacity-20">
                   <Package className="w-16 h-16" />
                   <p className="text-sm uppercase font-black tracking-widest">Data_Buffer_Empty</p>
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
                 {filtered.map((item) => {
                   const isChecked = selectedSerials.includes(item.serialNo);
                   return (
                     <div 
                       key={item.serialNo}
                       className={cn(
-                        "bg-white border-2 border-slate-900 p-4 neo-brutalism-shadow hover:translate-y-[-2px] hover:translate-x-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] transition-all flex flex-col justify-between group relative min-h-[175px] cursor-pointer",
-                        isChecked ? "border-blue-600 bg-blue-50/10 shadow-[3px_3px_0px_0px_rgba(37,99,235,1)]" : ""
+                        "bg-white border-2 border-slate-900 p-3.5 sm:p-4 neo-brutalism-shadow hover:translate-y-[-2px] hover:translate-x-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] transition-all flex flex-col justify-between group relative min-h-[185px] cursor-pointer",
+                        isChecked ? "border-blue-600 bg-blue-50/15 shadow-[3px_3px_0px_0px_rgba(37,99,235,1)]" : ""
                       )}
                       onClick={() => handleSelectItem(item)}
                     >
                       <div>
-                        {/* Header status and location */}
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        {/* Header status, invoice tag, and location */}
+                        <div className="flex items-center justify-between gap-1.5 mb-2">
+                          <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={(e) => toggleSelect(item.serialNo, e)}
                               className="p-0.5 text-slate-400 hover:text-blue-600 cursor-pointer"
@@ -887,36 +914,79 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                             </span>
                           </div>
                           
-                          <div className="flex items-center gap-1 max-w-[60%]">
-                            <MapPin className="w-2.5 h-2.5 opacity-30 shrink-0" />
-                            <span className="text-[8.5px] uppercase font-black tracking-widest truncate" title={item.currentLocation}>
-                              {item.currentLocation}
+                          <div className="flex items-center gap-1 max-w-[60%] justify-end">
+                            <MapPin className="w-2.5 h-2.5 text-blue-600 shrink-0" />
+                            <span className="text-[8.5px] uppercase font-black tracking-wider truncate text-slate-700" title={item.currentLocation}>
+                              {item.currentLocation || 'In-Base'}
                             </span>
                           </div>
                         </div>
 
-                        {/* Serial Number (Asset ID) */}
-                        <p className="text-[11px] font-black font-mono tracking-tighter text-slate-900 break-all bg-slate-50 border-2 border-slate-900/10 px-2 py-0.5 mb-2 leading-none">
-                          {getDisplaySerial(item.serialNo)}
-                        </p>
+                        {/* Invoice & Department Tags */}
+                        <div className="flex flex-wrap items-center gap-1 mb-2">
+                          {item.invoiceNo && (
+                            <span className="text-[7.5px] font-mono font-bold bg-slate-100 text-slate-800 px-1.5 py-0.5 border border-slate-300 truncate max-w-[130px]" title={item.invoiceNo}>
+                              📁 #{item.invoiceNo}
+                            </span>
+                          )}
+                          {item.segment && (
+                            <span className="text-[7.5px] font-mono font-bold bg-blue-50 text-blue-800 px-1.5 py-0.5 border border-blue-200 truncate max-w-[110px]" title={item.segment}>
+                              🏢 {item.segment}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Serial Number with Quick Copy button */}
+                        <div className="flex items-center justify-between gap-1 bg-slate-50 border-2 border-slate-900/15 px-2 py-1 mb-2">
+                          <p className="text-[11px] font-black font-mono tracking-tight text-slate-900 break-all leading-tight">
+                            {getDisplaySerial(item.serialNo)}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(getDisplaySerial(item.serialNo));
+                              setCopyNotification(`คัดลอก S/N: ${getDisplaySerial(item.serialNo)} เรียบร้อย`);
+                              setTimeout(() => setCopyNotification(null), 2500);
+                            }}
+                            className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-900 rounded cursor-pointer shrink-0"
+                            title="คัดลอก Serial Number"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        </div>
 
                         {/* Description and Part */}
-                        <div className="space-y-0.5">
-                          <p className="text-[8px] uppercase opacity-50 font-black tracking-tight">{item.partNo || 'NO PART REF'}</p>
-                          <p className="text-[9.5px] font-bold tracking-tight uppercase line-clamp-2 leading-tight text-slate-800" title={item.description}>
+                        <div className="space-y-0.5 mb-2">
+                          <div className="flex items-center justify-between gap-1">
+                            <p className="text-[8.5px] uppercase font-black tracking-tight text-blue-700 font-mono">
+                              {item.partNo || 'NO PART REF'}
+                            </p>
+                            {item.customsStatus && (
+                              <span className="text-[7px] font-bold text-purple-700 bg-purple-50 px-1 border border-purple-200">
+                                {item.customsStatus}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] font-bold tracking-tight uppercase line-clamp-2 leading-tight text-slate-800" title={item.description}>
                             {item.description}
                           </p>
+                          {item.meaningInThai && (
+                            <p className="text-[8.5px] font-semibold text-slate-500 line-clamp-1 italic">
+                              ({item.meaningInThai})
+                            </p>
+                          )}
                         </div>
 
                         {/* QTY & Action Button */}
-                        <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
-                          <span className="text-[9.5px] font-mono font-black text-slate-900 bg-amber-100 px-1.5 py-0.5 border border-amber-300">
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-[10px] font-mono font-black text-slate-950 bg-amber-200 px-2 py-0.5 border-2 border-slate-900 shadow-[1px_1px_0px_0px_rgba(15,23,42,1)]">
                             QTY: {item.qty !== undefined ? item.qty : 1} {item.uom || 'EA'}
                           </span>
                           <button
                             type="button"
                             onClick={(e) => handleOpenInOutModal(item, e)}
-                            className="px-2 py-1 bg-amber-400 hover:bg-amber-500 text-slate-950 border-2 border-slate-900 font-sans text-[8.5px] font-black uppercase tracking-tight flex items-center gap-1 shadow-[1.5px_1.5px_0px_0px_rgba(15,23,42,1)] cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                            className="px-2.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 border-2 border-slate-900 font-sans text-[9px] font-black uppercase tracking-tight flex items-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
                             title="ตัดสต็อกเบิกออก / คืนเข้าคลัง"
                           >
                             <RefreshCw className="w-3 h-3 text-slate-950" />
@@ -926,7 +996,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                       </div>
 
                       {/* Footer entry and timing */}
-                      <div className="mt-4 pt-2 border-t-2 border-slate-100 flex flex-col gap-1.5">
+                      <div className="mt-3 pt-2 border-t-2 border-slate-100 flex flex-col gap-1">
                         {item.importEntryNo ? (
                           <div className="flex items-center justify-between text-[8px] gap-2">
                             <span className="font-black text-blue-600 truncate italic">
@@ -942,11 +1012,11 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                           </div>
                         )}
                         
-                        <div className="text-[8.5px] font-mono font-bold text-slate-400 text-right flex items-center justify-between gap-1 leading-none mt-1">
-                          <span className="text-blue-600 font-sans font-black uppercase opacity-0 group-hover:opacity-100 transition-opacity text-[7.5px] tracking-wider shrink-0">
-                            ดูประวัติ ➔
+                        <div className="text-[8.5px] font-mono font-bold text-slate-400 text-right flex items-center justify-between gap-1 leading-none mt-0.5">
+                          <span className="text-blue-600 font-sans font-black uppercase text-[8px] tracking-wider shrink-0 flex items-center gap-0.5">
+                            ดูสเปค ➔
                           </span>
-                          <span className="text-right">
+                          <span className="text-right text-[8px]">
                             {item.lastUpdate?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} @ {item.lastUpdate?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
                           </span>
                         </div>
