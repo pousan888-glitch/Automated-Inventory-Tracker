@@ -967,8 +967,8 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
 
       {/* Floating Selection Action Panel */}
       {selectedSerials.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border-4 border-slate-900 text-white p-4 flex flex-col md:flex-row items-center justify-between gap-4 z-50 shadow-[4px_4px_0px_0px_rgba(244,63,94,1)] w-[90%] max-w-2xl select-none">
-          <div className="flex items-center gap-3">
+        <div className="fixed bottom-16 md:bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border-2 sm:border-4 border-slate-900 text-white p-3 sm:p-4 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4 z-40 shadow-[4px_4px_0px_0px_rgba(244,63,94,1)] w-[94%] sm:w-[90%] max-w-2xl select-none">
+          <div className="flex items-center justify-between w-full md:w-auto gap-3">
             <span className="px-2.5 py-1 bg-emerald-500 text-slate-950 font-mono text-[10px] font-black tracking-tight border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
               เลือก {selectedSerials.length} ชิ้น
             </span>
@@ -976,7 +976,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
               ตรวจสอบแล้ว {selectedSerials.length} รายการ ➔ สั่งทำการเขียนสเปค Excel ได้ทันที
             </p>
           </div>
-          <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
+          <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto justify-end w-full md:w-auto">
             <button
               type="button"
               onClick={() => {
@@ -1026,7 +1026,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
       {/* Pop-up Administrative Modal Panel (Tabbed & Form Editable) */}
       {selectedItem && tempItem && (
         <div 
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
           onClick={() => {
             setSelectedItem(null);
             setTempItem(null);
@@ -1036,7 +1036,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
           <motion.div 
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white border-4 border-slate-900 w-full max-w-5xl neo-brutalism-shadow relative my-8 flex flex-col max-h-[90vh] overflow-hidden rounded-none shadow-[6px_6px_0px_0px_rgba(15,23,42,1)]"
+            className="bg-white border-2 sm:border-4 border-slate-900 w-full max-w-5xl neo-brutalism-shadow relative my-auto sm:my-8 flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden rounded-none shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] sm:shadow-[6px_6px_0px_0px_rgba(15,23,42,1)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
@@ -1046,29 +1046,29 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                 setTempItem(null);
                 setIsLocationExpanded(false);
               }}
-              className="absolute top-4 right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1.5 transition-colors neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 z-10 cursor-pointer"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1 sm:p-1.5 transition-colors neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 z-10 cursor-pointer"
               aria-label="Close dialog"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
 
             {/* Modal Heading Header */}
-            <div className="bg-slate-900 text-white p-6 pr-16 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="bg-slate-900 text-white p-4 sm:p-6 pr-12 sm:pr-16 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <span className="text-[9px] uppercase font-black bg-blue-600 text-white px-2 py-0.5 border border-blue-400 font-mono tracking-widest">
+                  <span className="text-[8.5px] sm:text-[9px] uppercase font-black bg-blue-600 text-white px-2 py-0.5 border border-blue-400 font-mono tracking-widest">
                     แผงควบคุมหลักฝ่ายแอดมิน (CIPL PROFILE WORKSPACE)
                   </span>
-                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 border border-white font-black text-[9px] uppercase ${
+                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 border border-white font-black text-[8.5px] sm:text-[9px] uppercase ${
                     tempItem.status === 'IN' ? 'bg-emerald-600' : 'bg-red-600'
                   }`}>
                     {tempItem.status}
                   </span>
-                  <span className="bg-amber-300 text-amber-950 text-[9px] font-mono font-black px-2 py-0.5 border border-amber-400">
+                  <span className="bg-amber-300 text-amber-950 text-[8.5px] sm:text-[9px] font-mono font-black px-2 py-0.5 border border-amber-400">
                     คงเหลือ: {tempItem.qty !== undefined ? tempItem.qty : 1} {tempItem.uom || 'EA'}
                   </span>
                 </div>
-                <h3 className="text-xl md:text-2xl font-black font-mono tracking-tighter uppercase break-all">
+                <h3 className="text-lg md:text-2xl font-black font-mono tracking-tighter uppercase break-all">
                   {getDisplaySerial(tempItem.serialNo)}
                 </h3>
               </div>
@@ -1076,20 +1076,20 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
               <button
                 type="button"
                 onClick={(e) => handleOpenInOutModal(tempItem, e)}
-                className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-slate-950 border-2 border-slate-900 font-sans text-[10.5px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] cursor-pointer active:translate-x-0.5 active:translate-y-0.5 shrink-0"
+                className="px-3 py-1.5 sm:px-4 sm:py-2 bg-amber-400 hover:bg-amber-500 text-slate-950 border-2 border-slate-900 font-sans text-[9.5px] sm:text-[10.5px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] cursor-pointer active:translate-x-0.5 active:translate-y-0.5 shrink-0 self-start md:self-auto"
               >
-                <RefreshCw className="w-4 h-4 text-slate-950" />
+                <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-950" />
                 <span>ตัดสต็อก / เบิกออก-คืนเข้า (IN-OUT)</span>
               </button>
             </div>
 
             {/* Navigation Tab Heads */}
-            <div className="flex border-b-4 border-slate-900 bg-slate-100 font-black text-[10px] uppercase tracking-wider shrink-0 select-none">
+            <div className="flex border-b-2 sm:border-b-4 border-slate-900 bg-slate-100 font-black text-[9.5px] sm:text-[10px] uppercase tracking-wider shrink-0 select-none overflow-x-auto scrollbar-none">
               <button
                 type="button"
                 onClick={() => setModalTab('profile')}
                 className={cn(
-                  "px-6 py-4 border-r-2 border-slate-900 transition-colors uppercase cursor-pointer flex-1 md:flex-none",
+                  "px-4 sm:px-6 py-3 sm:py-4 border-r-2 border-slate-900 transition-colors uppercase cursor-pointer whitespace-nowrap",
                   modalTab === 'profile' ? "bg-white text-slate-900 border-b-[4px] border-b-blue-600" : "text-slate-500 hover:bg-slate-50"
                 )}
               >
@@ -1099,7 +1099,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                 type="button"
                 onClick={() => setModalTab('history')}
                 className={cn(
-                  "px-6 py-4 border-r-2 border-slate-900 transition-colors uppercase cursor-pointer flex-1 md:flex-none",
+                  "px-4 sm:px-6 py-3 sm:py-4 border-r-2 border-slate-900 transition-colors uppercase cursor-pointer whitespace-nowrap",
                   modalTab === 'history' ? "bg-white text-slate-900 border-b-[4px] border-b-blue-600" : "text-slate-500 hover:bg-slate-50"
                 )}
               >
@@ -1108,7 +1108,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
             </div>
 
             {/* Tab Panels Scrollable Body */}
-            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+            <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 bg-slate-50/50">
               {modalTab === 'profile' ? (
                 <div className="space-y-6">
                   {/* Master Description Details Section */}
@@ -1487,7 +1487,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
       {/* ➕ Pop-up Manual Add Item Modal Panel */}
       {isManualAddOpen && (
         <div 
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
           onClick={() => {
             if (!isManualSaving) {
               setIsManualAddOpen(false);
@@ -1497,7 +1497,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
           <motion.div 
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white border-4 border-slate-900 w-full max-w-4xl neo-brutalism-shadow relative my-8 flex flex-col max-h-[90vh] overflow-hidden rounded-none shadow-[6px_6px_0px_0px_rgba(15,23,42,1)]"
+            className="bg-white border-2 sm:border-4 border-slate-900 w-full max-w-4xl neo-brutalism-shadow relative my-auto sm:my-8 flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden rounded-none shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] sm:shadow-[6px_6px_0px_0px_rgba(15,23,42,1)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
@@ -1507,25 +1507,25 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                   setIsManualAddOpen(false);
                 }
               }}
-              className="absolute top-4 right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1.5 transition-colors neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 z-10 cursor-pointer"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1 sm:p-1.5 transition-colors neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 z-10 cursor-pointer"
               aria-label="Close dialog"
               disabled={isManualSaving}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
 
             {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-6 pr-16 shrink-0">
-              <span className="text-[9px] uppercase font-black bg-blue-600 text-white px-2 py-0.5 border border-blue-400 font-mono tracking-widest">
+            <div className="bg-slate-900 text-white p-4 sm:p-6 pr-12 sm:pr-16 shrink-0">
+              <span className="text-[8.5px] sm:text-[9px] uppercase font-black bg-blue-600 text-white px-2 py-0.5 border border-blue-400 font-mono tracking-widest">
                 เพิ่มข้อมูลสินค้าแมนนวล (MANUAL ITEM CREATION WORKSPACE)
               </span>
-              <h3 className="text-xl md:text-2xl font-black font-sans tracking-tight uppercase mt-1">
+              <h3 className="text-lg md:text-2xl font-black font-sans tracking-tight uppercase mt-1">
                 สร้างรายการสินค้าใหม่ด้วยตนเอง
               </h3>
             </div>
 
             {/* Modal Scrollable Body */}
-            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 space-y-6">
+            <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 bg-slate-50/50 space-y-4 sm:space-y-6">
               {manualError && (
                 <div className="bg-red-50 border-2 border-red-900 p-4 flex items-start gap-3">
                   <ShieldAlert className="w-5 h-5 text-red-700 shrink-0 mt-0.5" />
@@ -1964,16 +1964,16 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
             </div>
 
             {/* Modal Footer Controls */}
-            <div className="p-4 bg-white border-t-4 border-slate-900 flex justify-between items-center px-6 shrink-0 flex-wrap gap-4 select-none">
-              <span className="text-[9.5px] font-sans font-extrabold text-slate-400">
+            <div className="p-3 sm:p-4 bg-white border-t-2 sm:border-t-4 border-slate-900 flex justify-between items-center px-4 sm:px-6 shrink-0 flex-wrap gap-3 select-none">
+              <span className="text-[8.5px] sm:text-[9.5px] font-sans font-extrabold text-slate-400">
                 ⚠️ การคลิกปุ่มบันทึกจะสร้าง Log ประวัติเข้าคลัง MANUAL-ENTRY โดยอัตโนมัติ
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 <button
                   type="button"
                   onClick={() => setIsManualAddOpen(false)}
                   disabled={isManualSaving}
-                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-900 border-2 border-slate-900 text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                  className="px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-900 border-2 border-slate-900 text-[10px] font-black uppercase tracking-wider cursor-pointer"
                 >
                   ยกเลิก (Cancel)
                 </button>
@@ -1981,7 +1981,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                   type="button"
                   onClick={handleSaveManualItem}
                   disabled={isManualSaving}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white border-2 border-slate-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+                  className="px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white border-2 border-slate-900 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isManualSaving ? 'กำลังจัดเก็บสินค้า...' : 'บันทึกเพิ่มสินค้า (Save Item)'}</span>
@@ -1995,37 +1995,37 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
       {/* 🚚 Pop-up IN/OUT Stock Deduction Modal Panel */}
       {inOutItem && (
         <div 
-          className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto select-none"
+          className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4 overflow-y-auto select-none"
           onClick={() => { if (!isInOutProcessing) setInOutItem(null); }}
         >
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white border-4 border-slate-900 w-full max-w-lg neo-brutalism-shadow relative my-8 flex flex-col overflow-hidden rounded-none shadow-[8px_8px_0px_0px_rgba(15,23,42,1)]"
+            className="bg-white border-2 sm:border-4 border-slate-900 w-full max-w-lg neo-brutalism-shadow relative my-auto sm:my-8 flex flex-col overflow-hidden rounded-none shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] sm:shadow-[8px_8px_0px_0px_rgba(15,23,42,1)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Close Button */}
             <button 
               onClick={() => { if (!isInOutProcessing) setInOutItem(null); }}
-              className="absolute top-4 right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1.5 transition-colors z-10 cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1 sm:p-1.5 transition-colors z-10 cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
               disabled={isInOutProcessing}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
 
             {/* Header */}
-            <div className="bg-slate-900 text-white p-5 pr-14">
-              <span className="text-[8.5px] font-black uppercase bg-amber-400 text-slate-950 px-2 py-0.5 border border-amber-300 font-mono tracking-widest">
+            <div className="bg-slate-900 text-white p-4 sm:p-5 pr-12 sm:pr-14">
+              <span className="text-[8px] sm:text-[8.5px] font-black uppercase bg-amber-400 text-slate-950 px-2 py-0.5 border border-amber-300 font-mono tracking-widest">
                 ระบบจัดการตัดสต็อกเบิกสินค้า (IN / OUT STOCK CUTTING WORKSPACE)
               </span>
-              <h3 className="text-lg md:text-xl font-black font-sans tracking-tight uppercase mt-1 flex items-center gap-2">
-                <RefreshCw className="w-5 h-5 text-amber-400" />
+              <h3 className="text-base sm:text-xl font-black font-sans tracking-tight uppercase mt-1 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
                 <span>ทำรายการเบิกออก / คืนเข้าสต็อก</span>
               </h3>
             </div>
 
             {/* Item Summary Box */}
-            <div className="p-5 bg-slate-50 border-b-2 border-slate-900 space-y-2">
+            <div className="p-3.5 sm:p-5 bg-slate-50 border-b-2 border-slate-900 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[11px] font-mono font-black text-blue-600 bg-blue-50 px-2 py-0.5 border border-blue-200">
                   S/N: {getDisplaySerial(inOutItem.serialNo)}
@@ -2385,50 +2385,61 @@ export function TransactionHistory() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: Math.min(idx * 0.05, 0.4) }}
                 key={`${log.serialNo}-${idx}`}
-                className="bg-white border-2 border-slate-900 p-8 flex items-center gap-12 neo-brutalism-shadow active-neo-brutalism relative overflow-hidden group"
+                className="bg-white border-2 border-slate-900 p-4 sm:p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-4 md:gap-8 lg:gap-12 neo-brutalism-shadow active-neo-brutalism relative overflow-hidden group"
               >
-                <div className={`w-2 h-full absolute left-0 top-0 ${log.transactionType === 'IN' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                <div className={`w-1.5 md:w-2 h-full absolute left-0 top-0 ${log.transactionType === 'IN' ? 'bg-emerald-500' : 'bg-red-500'}`} />
                 
-                <div className="shrink-0 flex flex-col items-center gap-1 w-24">
-                  <span className="text-[11px] font-mono font-black italic">
-                    {log.date?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
-                  </span>
-                  <span className="text-[9px] uppercase font-black opacity-30 mt-1">
-                    {log.date?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-
-                <div className="w-64 shrink-0">
-                  <p className="text-[9px] uppercase font-black text-slate-400 mb-2 tracking-widest">Invoice Ref</p>
-                  <p className="text-xs font-black font-mono">#{log.invoiceNo}</p>
-                </div>
-
-                <div className="flex-1 grid grid-cols-4 gap-12">
-                  <div className="border-l-2 border-slate-100 pl-8">
-                    <p className="text-[9px] uppercase font-black text-slate-400 mb-2 tracking-widest">Asset ID</p>
-                    <p className="text-xs font-black font-mono tracking-tighter">{log.serialNo}</p>
+                <div className="flex items-center justify-between md:flex-col md:items-center gap-1 md:w-24 shrink-0">
+                  <div className="flex flex-col md:items-center">
+                    <span className="text-[11px] font-mono font-black italic">
+                      {log.date?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
+                    </span>
+                    <span className="text-[9px] uppercase font-black opacity-45 mt-0.5">
+                      {log.date?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
-                  <div className="col-span-2 border-l-2 border-slate-100 pl-8">
-                    <p className="text-[9px] uppercase font-black text-slate-400 mb-2 tracking-widest">Geographic Routing</p>
-                    <div className="flex items-center gap-4">
-                      <span className="text-[10px] uppercase font-black truncate max-w-[140px]">{log.origin}</span>
-                      <div className="flex items-center gap-1 opacity-20">
+
+                  {/* Badge on mobile */}
+                  <div className={cn(
+                    "md:hidden px-2 py-1 border-2 border-slate-900 flex items-center gap-1 font-black text-[9px] uppercase",
+                    log.transactionType === 'IN' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                  )}>
+                    {log.transactionType === 'IN' ? <ArrowDownLeft className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
+                    <span>{log.transactionType}</span>
+                  </div>
+                </div>
+
+                <div className="w-full md:w-56 shrink-0">
+                  <p className="text-[8.5px] uppercase font-black text-slate-400 mb-1 tracking-widest">Invoice Ref</p>
+                  <p className="text-xs font-black font-mono break-all">#{log.invoiceNo}</p>
+                </div>
+
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 w-full">
+                  <div className="border-t sm:border-t-0 md:border-l-2 border-slate-100 pt-2 sm:pt-0 md:pl-6">
+                    <p className="text-[8.5px] uppercase font-black text-slate-400 mb-1 tracking-widest">Asset ID</p>
+                    <p className="text-xs font-black font-mono tracking-tighter break-all">{log.serialNo}</p>
+                  </div>
+                  <div className="sm:col-span-2 border-t sm:border-t-0 md:border-l-2 border-slate-100 pt-2 sm:pt-0 md:pl-6">
+                    <p className="text-[8.5px] uppercase font-black text-slate-400 mb-1 tracking-widest">Geographic Routing</p>
+                    <div className="flex items-center gap-2 sm:gap-4">
+                      <span className="text-[10px] uppercase font-black truncate max-w-[120px]">{log.origin}</span>
+                      <div className="flex items-center gap-1 opacity-40 shrink-0">
                         <div className="w-1 h-1 bg-slate-900" />
-                        <div className="w-12 h-[2px] bg-slate-900" />
-                        <ArrowUpRight className="w-4 h-4" />
+                        <div className="w-6 sm:w-12 h-[2px] bg-slate-900" />
+                        <ArrowUpRight className="w-3.5 h-3.5" />
                       </div>
-                      <span className="text-[10px] uppercase font-black truncate max-w-[140px] text-blue-600">{log.destination}</span>
+                      <span className="text-[10px] uppercase font-black truncate max-w-[120px] text-blue-600">{log.destination}</span>
                     </div>
                   </div>
-                  <div className="border-l-2 border-slate-100 pl-8">
-                    <p className="text-[9px] uppercase font-black text-slate-400 mb-2 tracking-widest">Import Entry</p>
-                    <p className="text-[11px] font-black italic text-blue-600">{log.importEntryNo || 'N/A'}</p>
-                    <p className="text-[9px] font-bold uppercase opacity-30 tracking-widest">Line {log.importEntryLineNo || '-'}</p>
+                  <div className="border-t sm:border-t-0 md:border-l-2 border-slate-100 pt-2 sm:pt-0 md:pl-6">
+                    <p className="text-[8.5px] uppercase font-black text-slate-400 mb-1 tracking-widest">Import Entry</p>
+                    <p className="text-[11px] font-black italic text-blue-600 truncate">{log.importEntryNo || 'N/A'}</p>
+                    <p className="text-[8.5px] font-bold uppercase opacity-30 tracking-widest">Line {log.importEntryLineNo || '-'}</p>
                   </div>
                 </div>
 
                 <div className={cn(
-                  "shrink-0 w-24 h-24 border-2 border-slate-900 flex flex-col items-center justify-center gap-1",
+                  "hidden md:flex shrink-0 w-20 h-20 border-2 border-slate-900 flex-col items-center justify-center gap-1",
                   log.transactionType === 'IN' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
                 )}>
                   {log.transactionType === 'IN' ? <ArrowDownLeft className="w-6 h-6" /> : <ArrowUpRight className="w-6 h-6" />}
@@ -2533,8 +2544,6 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
   const [logs, setLogs] = useState<TransactionLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<TransactionLog | null>(null);
   const [showOnlyMine, setShowOnlyMine] = useState(false);
-  const [deptSearch, setDeptSearch] = useState('');
-  const [quickViewDept, setQuickViewDept] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub1 = subscribeToInventory(setItems);
@@ -2638,21 +2647,21 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
   const pctOut = totalCount > 0 ? (totalOut / totalCount) * 100 : 0;
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 sm:space-y-8 animate-fade-in w-full max-w-full overflow-hidden">
       
       {/* Upper sub-header toolbar exact image layout */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b-2 border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pb-2 border-b-2 border-slate-200">
         <div>
-          <span className="text-[10px] font-black tracking-widest text-[#3b82f6] uppercase">SYNCHRONIZED LEDGER</span>
-          <h3 className="text-lg font-black font-sans text-slate-900 tracking-tight uppercase flex items-center gap-2">
+          <span className="text-[9px] sm:text-[10px] font-black tracking-widest text-[#3b82f6] uppercase">SYNCHRONIZED LEDGER</span>
+          <h3 className="text-base sm:text-lg font-black font-sans text-slate-900 tracking-tight uppercase flex items-center gap-2">
             <span className="w-1.5 h-4 bg-[#3b82f6] inline-block"></span>
             Asset Management Workspace
           </h3>
         </div>
         
         {/* Toggle Switch design matching image */}
-        <div className="flex items-center gap-3 bg-white px-3 py-1.5 border-2 border-slate-900 rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
-          <span className="text-[11px] font-black uppercase text-slate-700 font-mono tracking-tight">แสดงเฉพาะของฉัน</span>
+        <div className="flex items-center justify-between sm:justify-start gap-3 bg-white px-3 py-1.5 border-2 border-slate-900 rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] self-start sm:self-auto">
+          <span className="text-[10.5px] sm:text-[11px] font-black uppercase text-slate-700 font-mono tracking-tight">แสดงเฉพาะของฉัน</span>
           <button 
             type="button"
             onClick={() => setShowOnlyMine(!showOnlyMine)}
@@ -2666,27 +2675,27 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
         </div>
       </div>
 
-      {/* 4 Metric cards in a row with wave graphics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+      {/* 4 Metric cards in a responsive grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-6">
         {stats.map((stat, idx) => (
           <div 
             key={idx} 
-            className="bg-white border-2 border-slate-900 flex flex-col justify-between p-6 rounded-none shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] hover:translate-y-[-2px] hover:translate-x-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(11,22,44,1)] transition-all duration-200 group relative overflow-hidden min-h-40"
+            className="bg-white border-2 border-slate-900 flex flex-col justify-between p-3.5 sm:p-6 rounded-none shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] sm:shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] hover:translate-y-[-2px] hover:translate-x-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(11,22,44,1)] transition-all duration-200 group relative overflow-hidden min-h-28 sm:min-h-40"
           >
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-1.5 border border-slate-950 bg-slate-50 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-200 shrink-0">
-                  <stat.icon className="w-3.5 h-3.5 text-slate-900 group-hover:text-white" />
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4">
+                <div className="p-1 sm:p-1.5 border border-slate-950 bg-slate-50 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-200 shrink-0">
+                  <stat.icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-900 group-hover:text-white" />
                 </div>
-                <span className="text-[9px] uppercase font-black tracking-wider text-slate-500 font-sans">{stat.label}</span>
+                <span className="text-[8px] sm:text-[9px] uppercase font-black tracking-wider text-slate-500 font-sans truncate">{stat.label}</span>
               </div>
               <div className="z-10 relative">
-                <span className="text-4xl font-black font-mono tracking-tighter text-slate-900">{stat.value}</span>
+                <span className="text-2xl sm:text-4xl font-black font-mono tracking-tighter text-slate-900">{stat.value}</span>
               </div>
             </div>
             
             {/* Smooth trendline graphics exactly like the image mockup bottom waves */}
-            <div className="absolute inset-x-0 bottom-0 h-10 w-full opacity-60 pointer-events-none">
+            <div className="absolute inset-x-0 bottom-0 h-8 sm:h-10 w-full opacity-60 pointer-events-none">
               <svg width="100%" height="100%" viewBox="0 0 250 40" preserveAspectRatio="none">
                 <defs>
                   <linearGradient id={`grad-${idx}`} x1="0%" y1="0%" x2="0%" y2="100%">
@@ -2699,7 +2708,7 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
             </div>
 
             {stat.trend && (
-              <span className="absolute top-4 right-4 text-[7.5px] font-mono font-black border border-emerald-500 bg-emerald-50 text-emerald-700 px-1 py-0.5 leading-none">
+              <span className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 text-[7px] sm:text-[7.5px] font-mono font-black border border-emerald-500 bg-emerald-50 text-emerald-700 px-1 py-0.5 leading-none">
                 {stat.trend}
               </span>
             )}
@@ -2708,40 +2717,40 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
       </div>
 
       {/* PROMINENT TOP PANEL: Department Breakdown (เห็นเด่นชัดทันทีด้านบน ไม่ต้องเลื่อนลง) */}
-      <div className="bg-white border-2 border-slate-900 p-5 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)]">
+      <div className="bg-white border-2 border-slate-900 p-3.5 sm:p-5 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b-2 border-slate-900">
-          <div className="flex items-center gap-3">
-            <div className="p-2 border-2 border-slate-900 bg-blue-600 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
-              <Building2 className="w-5 h-5" />
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="p-1.5 sm:p-2 border-2 border-slate-900 bg-blue-600 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] shrink-0">
+              <Building2 className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-base font-black uppercase tracking-tight text-slate-900 font-sans">
+                <h4 className="text-sm sm:text-base font-black uppercase tracking-tight text-slate-900 font-sans">
                   สรุปสต็อกแยกตามแผนก
                 </h4>
-                <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300 font-mono">
+                <span className="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300 font-mono">
                   {departmentStats.length} แผนก
                 </span>
               </div>
-              <p className="text-[11px] font-mono text-slate-500 uppercase tracking-tight">
+              <p className="text-[10px] sm:text-[11px] font-mono text-slate-500 uppercase tracking-tight">
                 DEPARTMENT INVENTORY BREAKDOWN
               </p>
             </div>
           </div>
 
           {/* Grand Total Highlight Badge */}
-          <div className="flex items-center gap-3 bg-slate-900 text-white px-4 py-2 border border-slate-900 shadow-[2px_2px_0px_0px_rgba(59,130,246,1)]">
-            <span className="text-[11px] font-mono uppercase text-slate-300 tracking-wider">
+          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-3 bg-slate-900 text-white px-3 py-2 sm:px-4 sm:py-2 border border-slate-900 shadow-[2px_2px_0px_0px_rgba(59,130,246,1)]">
+            <span className="text-[10px] sm:text-[11px] font-mono uppercase text-slate-300 tracking-wider">
               ยอดคงคลังรวมทุกแผนก:
             </span>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-black font-mono text-emerald-400">
+              <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
                 {grandTotalQty.toLocaleString()}
               </span>
-              <span className="text-xs font-bold text-slate-300 font-sans uppercase">
+              <span className="text-[11px] sm:text-xs font-bold text-slate-300 font-sans uppercase">
                 ชิ้น
               </span>
-              <span className="text-[10px] text-slate-400 font-mono ml-1">
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-mono ml-1">
                 ({filteredItems.length} รายการ)
               </span>
             </div>
@@ -2760,12 +2769,12 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
               return (
                 <div 
                   key={idx}
-                  onClick={() => setQuickViewDept(dept.name)}
+                  onClick={() => onNavigateToInventory?.(dept.name)}
                   className="bg-slate-50/90 border-2 border-slate-200 hover:border-slate-900 p-3.5 flex flex-col justify-between transition-all duration-150 hover:shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] group cursor-pointer relative"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="font-sans font-black text-xs text-slate-900 uppercase truncate" title={dept.name}>
+                      <span className="font-sans font-black text-xs text-slate-900 uppercase truncate group-hover:text-blue-900" title={dept.name}>
                         {dept.name}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -2773,17 +2782,12 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
                           {pct.toFixed(1)}%
                         </span>
                         {onNavigateToInventory && (
-                          <button
-                            type="button"
+                          <div 
+                            className="p-0.5 text-slate-400 group-hover:text-blue-700 transition-colors"
                             title="ไปที่หน้าคลังสินค้า (Filter Inventory)"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onNavigateToInventory(dept.name);
-                            }}
-                            className="p-0.5 text-slate-400 hover:text-blue-700 hover:bg-blue-100 border border-transparent hover:border-blue-400 transition-colors"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                          </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -2808,9 +2812,7 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
                     </div>
                     <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
                       <span>{dept.count.toLocaleString()} รายการ (SKUs)</span>
-                      <span className="text-blue-700 font-bold group-hover:underline flex items-center gap-0.5">
-                        <Eye className="w-3 h-3" /> ดูข้อมูลแผนก
-                      </span>
+                      <span className="text-slate-400">จากทั้งหมด {grandTotalQty.toLocaleString()} ชิ้น</span>
                     </div>
                   </div>
                 </div>
@@ -2821,18 +2823,21 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
       </div>
 
       {/* Main split grid: Left Asset Management Table, Right Side Dashboard Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start w-full max-w-full">
         
         {/* Left Column: Asset Management Hub TABLE */}
-        <div className="lg:col-span-8 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-300 pb-2">
+        <div className="lg:col-span-8 space-y-4 w-full max-w-full overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-slate-300 pb-2">
             <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 flex items-center gap-2">
               <span className="w-2 h-2 bg-slate-950 inline-block"></span>
               ASSET MANAGEMENT HUB
             </h3>
-            <span className="text-[8.5px] font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 border border-slate-200">
-              คลิกที่แถวรายการเพื่อสืบรายละเอียด (Row items searchable)
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[8.5px] text-slate-500 font-mono md:hidden">← เลื่อนตารางซ้ายขวาได้ →</span>
+              <span className="text-[8.5px] font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 border border-slate-200 hidden sm:inline-block">
+                คลิกที่แถวรายการเพื่อสืบรายละเอียด (Row items searchable)
+              </span>
+            </div>
           </div>
 
           <div className="bg-white border-2 border-slate-900 overflow-hidden shadow-[4px_4px_0px_0px_rgba(15,23,42,1)]">
@@ -3033,110 +3038,6 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
             </div>
           </div>
 
-          {/* Card 3: DEPARTMENT INVENTORY (แยกตามแผนก / Segment) */}
-          <div className="bg-white border-2 border-slate-900 p-5 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] space-y-3">
-            <div className="border-b border-slate-200 pb-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1 border border-slate-950 bg-blue-50 text-blue-700">
-                  <Building2 className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <h4 className="text-[10.5px] font-black uppercase tracking-wider text-slate-900 leading-tight">
-                    สต็อกแยกตามแผนก
-                  </h4>
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
-                    DEPARTMENT BREAKDOWN
-                  </span>
-                </div>
-              </div>
-              <span className="text-[9px] font-mono font-black text-blue-800 bg-blue-50 border border-blue-200 px-1.5 py-0.5 shadow-sm">
-                {departmentStats.length} แผนก
-              </span>
-            </div>
-
-            {/* Department search filter if more than 3 departments */}
-            {departmentStats.length > 3 && (
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="ค้นหาแผนก..."
-                  value={deptSearch}
-                  onChange={(e) => setDeptSearch(e.target.value)}
-                  className="w-full text-[10px] pl-6 pr-5 py-1 bg-slate-50 border border-slate-300 focus:outline-none focus:border-blue-600 font-sans placeholder:text-slate-400"
-                />
-                <Search className="w-3 h-3 text-slate-400 absolute left-2 top-2" />
-                {deptSearch && (
-                  <button 
-                    onClick={() => setDeptSearch('')}
-                    className="absolute right-2 top-1 text-slate-400 hover:text-slate-700 text-xs font-bold"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            )}
-
-            <div className="space-y-2 pt-0.5 max-h-[360px] overflow-y-auto pr-1">
-              {departmentStats.length === 0 ? (
-                <div className="p-5 bg-slate-50 border border-slate-200 text-[9.5px] font-bold text-slate-400 uppercase text-center rounded-none font-sans">
-                  ไม่พบข้อมูลสินค้าคงคลังในระบบ
-                </div>
-              ) : (
-                departmentStats
-                  .filter(d => !deptSearch || d.name.toLowerCase().includes(deptSearch.toLowerCase()))
-                  .map((dept, index) => {
-                    const pct = grandTotalQty > 0 ? (dept.totalQty / grandTotalQty) * 100 : 0;
-                    return (
-                      <div 
-                        key={index} 
-                        onClick={() => setQuickViewDept(dept.name)}
-                        className="p-2.5 bg-slate-50/80 hover:bg-blue-50/70 border border-slate-300 hover:border-slate-900 flex flex-col gap-1.5 transition-all duration-150 cursor-pointer group"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-sans font-black text-[11px] text-slate-900 uppercase truncate group-hover:text-blue-900" title={dept.name}>
-                            {dept.name}
-                          </span>
-                          <div className="flex items-baseline gap-1 shrink-0">
-                            <span className="font-mono font-black text-[13px] text-blue-700">
-                              {dept.totalQty.toLocaleString()}
-                            </span>
-                            <span className="text-[9px] font-black text-slate-600 font-sans uppercase">
-                              ชิ้น
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div className="w-full bg-slate-200 h-1.5 overflow-hidden border border-slate-300">
-                          <div 
-                            className="bg-blue-600 h-full transition-all duration-500" 
-                            style={{ width: `${Math.max(pct, 2)}%` }}
-                          />
-                        </div>
-
-                        <div className="flex justify-between items-center text-[8.5px] font-mono text-slate-500 pt-0.5">
-                          <span>{dept.count.toLocaleString()} รายการ (SKUs)</span>
-                          <span className="font-black text-slate-700 bg-white px-1 border border-slate-200 group-hover:border-blue-400 group-hover:text-blue-700 flex items-center gap-0.5">
-                            <Eye className="w-2.5 h-2.5" /> ดูข้อมูล ({pct.toFixed(1)}%)
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })
-              )}
-            </div>
-
-            {/* Bottom Total Footer */}
-            {departmentStats.length > 0 && (
-              <div className="pt-2 border-t-2 border-slate-900 flex items-center justify-between text-[9.5px] font-mono font-bold text-slate-700 bg-slate-100 px-2.5 py-1.5">
-                <span>ยอดรวมสต็อกทั้งหมด:</span>
-                <span className="text-blue-700 font-black text-[11px]">
-                  {grandTotalQty.toLocaleString()} ชิ้น ({filteredItems.length} รายการ)
-                </span>
-              </div>
-            )}
-          </div>
-
         </div>
 
       </div>
@@ -3295,155 +3196,6 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
           </motion.div>
         </div>
       )}
-
-      {/* Department Quick-View Modal */}
-      {quickViewDept && (() => {
-        const deptItems = filteredItems.filter(i => {
-          const rawDept = (i.segment || '').trim();
-          const dept = rawDept || 'ไม่ระบุแผนก (Unassigned)';
-          return dept === quickViewDept;
-        });
-        const deptTotalQty = deptItems.reduce((acc, curr) => acc + (curr.qty !== undefined && Number(curr.qty) > 0 ? Number(curr.qty) : 1), 0);
-        const inItems = deptItems.filter(i => i.status === 'IN');
-        const inQty = inItems.reduce((acc, curr) => acc + (curr.qty !== undefined && Number(curr.qty) > 0 ? Number(curr.qty) : 1), 0);
-        const outItems = deptItems.filter(i => i.status === 'OUT');
-        const outQty = outItems.reduce((acc, curr) => acc + (curr.qty !== undefined && Number(curr.qty) > 0 ? Number(curr.qty) : 1), 0);
-
-        return (
-          <div className="fixed inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-3 sm:p-4">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white border-2 border-slate-900 shadow-[8px_8px_0px_0px_rgba(15,23,42,1)] w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
-            >
-              {/* Header */}
-              <div className="p-4 sm:p-5 bg-slate-900 text-white flex justify-between items-start shrink-0 border-b-2 border-slate-900">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-blue-500 inline-block"></span>
-                    <span className="text-[10px] font-mono font-black text-blue-400 uppercase tracking-widest">
-                      DEPARTMENT QUICK VIEW • หน้าต่างสืบค้นด่วน
-                    </span>
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-sans font-black tracking-tight uppercase flex items-center gap-2">
-                    แผนก: <span className="text-blue-400">{quickViewDept}</span>
-                  </h3>
-                </div>
-                <button 
-                  onClick={() => setQuickViewDept(null)}
-                  className="p-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Summary Stats Row */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-100 border-b-2 border-slate-300 text-xs font-mono">
-                <div className="bg-white p-2.5 border border-slate-300">
-                  <p className="text-[9px] font-bold text-slate-500 uppercase font-sans">จำนวนสินค้าทั้งหมด</p>
-                  <p className="text-xl font-black text-blue-700">{deptTotalQty.toLocaleString()} <span className="text-xs text-slate-600 font-sans">ชิ้น</span></p>
-                </div>
-                <div className="bg-white p-2.5 border border-slate-300">
-                  <p className="text-[9px] font-bold text-slate-500 uppercase font-sans">จำนวนรายการ (SKUs)</p>
-                  <p className="text-xl font-black text-slate-900">{deptItems.length.toLocaleString()} <span className="text-xs text-slate-600 font-sans">รายการ</span></p>
-                </div>
-                <div className="bg-white p-2.5 border border-slate-300">
-                  <p className="text-[9px] font-bold text-emerald-700 uppercase font-sans">คงคลัง (IN)</p>
-                  <p className="text-xl font-black text-emerald-600">{inQty.toLocaleString()} <span className="text-xs text-slate-600 font-sans">ชิ้น</span></p>
-                </div>
-                <div className="bg-white p-2.5 border border-slate-300">
-                  <p className="text-[9px] font-bold text-rose-700 uppercase font-sans">เบิกออก (OUT)</p>
-                  <p className="text-xl font-black text-rose-600">{outQty.toLocaleString()} <span className="text-xs text-slate-600 font-sans">ชิ้น</span></p>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              <div className="flex-1 overflow-y-auto p-4">
-                {deptItems.length === 0 ? (
-                  <div className="py-12 text-center text-xs font-bold text-slate-400 uppercase italic">
-                    ไม่พบรายการสินค้าในแผนกนี้
-                  </div>
-                ) : (
-                  <div className="border border-slate-300 overflow-x-auto">
-                    <table className="w-full text-left border-collapse font-mono text-xs">
-                      <thead>
-                        <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider divide-x divide-slate-800">
-                          <th className="px-3 py-2">Serial No. / Tag</th>
-                          <th className="px-3 py-2">Part No.</th>
-                          <th className="px-3 py-2">Description</th>
-                          <th className="px-3 py-2">Location</th>
-                          <th className="px-3 py-2 text-right">Qty</th>
-                          <th className="px-3 py-2 text-center">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800">
-                        {deptItems.map((item, idx) => (
-                          <tr key={item.id || idx} className="hover:bg-blue-50/50 divide-x divide-slate-200">
-                            <td className="px-3 py-2 font-bold text-blue-700 whitespace-nowrap">
-                              {getDisplaySerial(item)}
-                            </td>
-                            <td className="px-3 py-2 font-bold whitespace-nowrap">
-                              {item.partNo || '-'}
-                            </td>
-                            <td className="px-3 py-2 max-w-xs truncate" title={item.description}>
-                              {item.description || '-'}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                              {item.location || '-'}
-                            </td>
-                            <td className="px-3 py-2 text-right font-black text-slate-900 whitespace-nowrap">
-                              {(item.qty || 1).toLocaleString()} {item.unit || 'ชิ้น'}
-                            </td>
-                            <td className="px-3 py-2 text-center whitespace-nowrap">
-                              <span className={`px-2 py-0.5 border text-[9px] font-extrabold leading-none tracking-tight uppercase ${
-                                item.status === 'IN' 
-                                  ? 'border-emerald-500 bg-emerald-50 text-emerald-800' 
-                                  : 'border-rose-500 bg-rose-50 text-rose-800'
-                              }`}>
-                                {item.status === 'IN' ? 'IN-STOCK' : 'OUT-OF-STOCK'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Footer with Action Buttons */}
-              <div className="p-4 bg-slate-50 border-t-2 border-slate-300 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
-                <span className="text-[11px] font-mono text-slate-500">
-                  แสดงรายการสินค้าทั้งหมดของแผนก <strong className="text-slate-900">{quickViewDept}</strong> ({deptItems.length} รายการ)
-                </span>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <button 
-                    onClick={() => setQuickViewDept(null)}
-                    className="flex-1 sm:flex-none px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border-2 border-slate-300 text-xs font-bold uppercase transition-all cursor-pointer"
-                  >
-                    ปิดหน้าต่าง
-                  </button>
-                  {onNavigateToInventory && (
-                    <button 
-                      onClick={() => {
-                        const dept = quickViewDept;
-                        setQuickViewDept(null);
-                        onNavigateToInventory(dept);
-                      }}
-                      className="flex-1 sm:flex-none px-5 py-2 bg-blue-700 hover:bg-blue-800 text-white border-2 border-slate-900 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
-                    >
-                      <span>ไปที่หน้า Inventory เพื่อจัดการ</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-            </motion.div>
-          </div>
-        );
-      })()}
 
     </div>
   );

@@ -887,14 +887,14 @@ export default function FileProcessor() {
           <div 
             {...getRootProps()} 
             className={cn(
-              "border-4 border-dashed p-16 flex flex-col items-center justify-center transition-all bg-white cursor-pointer",
+              "border-4 border-dashed p-6 sm:p-12 md:p-16 flex flex-col items-center justify-center transition-all bg-white cursor-pointer",
               isDragActive ? "border-blue-600 bg-blue-50" : "border-slate-300 hover:border-slate-900",
               uploadType === 'IN' ? "hover:bg-emerald-50/20" : "hover:bg-red-50/20"
             )}
           >
             <input {...getInputProps()} />
-            <div className="w-16 h-16 border-2 border-slate-900 flex items-center justify-center mb-6 bg-slate-100">
-              <Upload className="w-8 h-8 text-slate-900" />
+            <div className="w-12 h-12 sm:w-16 sm:h-16 border-2 border-slate-900 flex items-center justify-center mb-4 sm:mb-6 bg-slate-100">
+              <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-slate-900" />
             </div>
             <h3 className="text-xs font-black uppercase tracking-widest mb-2 font-sans text-center">
               Upload Shipping Invoice ({uploadType === 'IN' ? 'ของเข้า / INCOMING' : 'ของออก / OUTGOING'})
@@ -903,7 +903,7 @@ export default function FileProcessor() {
               Supports XLSX, CSV, XLS
             </p>
             <button className={cn(
-              "mt-8 px-12 py-3 text-white font-bold text-[10px] uppercase tracking-widest active-neo-brutalism neo-brutalism-shadow",
+              "mt-6 sm:mt-8 px-8 sm:px-12 py-2.5 sm:py-3 text-white font-bold text-[10px] uppercase tracking-widest active-neo-brutalism neo-brutalism-shadow",
               uploadType === 'IN' ? "bg-emerald-600" : "bg-red-600"
             )}>
               Browse Files
@@ -911,20 +911,20 @@ export default function FileProcessor() {
           </div>
 
           {/* 📦 SCHLUMBERGER - FZ Inventory Report Upload Section */}
-          <div className="bg-white border-2 border-slate-900 p-5 neo-brutalism-shadow space-y-4">
+          <div className="bg-white border-2 border-slate-900 p-4 sm:p-5 neo-brutalism-shadow space-y-3 sm:space-y-4">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block font-mono">
               ข้อมูลประมวลผลรายงานสินค้า Free Zone (SCHLUMBERGER - FZ INVENTORY REPORT)
             </label>
             <div 
               {...getFzRootProps()} 
               className={cn(
-                "border-4 border-dashed p-12 flex flex-col items-center justify-center transition-all bg-slate-50 cursor-pointer",
+                "border-4 border-dashed p-6 sm:p-10 md:p-12 flex flex-col items-center justify-center transition-all bg-slate-50 cursor-pointer",
                 isFzDragActive ? "border-amber-600 bg-amber-50" : "border-slate-300 hover:border-slate-900"
               )}
             >
               <input {...getFzInputProps()} />
-              <div className="w-12 h-12 border-2 border-slate-900 flex items-center justify-center mb-4 bg-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
-                <FileSpreadsheet className="w-6 h-6 text-slate-900" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-slate-900 flex items-center justify-center mb-3 sm:mb-4 bg-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
+                <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6 text-slate-900" />
               </div>
               <h4 className="text-[11px] font-black uppercase tracking-widest mb-1 font-sans text-center">
                 SCHLUMBERGER - FZ Inventory Report
@@ -932,7 +932,7 @@ export default function FileProcessor() {
               <p className="text-[9px] opacity-50 uppercase tracking-widest text-center max-w-xs font-mono">
                 สแกนรายงานอัปเดตคลังรายสัปดาห์จากผู้บริหารฟรีโซน (XLSX, CSV, XLS)
               </p>
-              <button className="mt-4 px-8 py-2 bg-slate-950 text-white font-bold text-[9px] uppercase tracking-widest active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+              <button className="mt-4 px-6 sm:px-8 py-2 bg-slate-950 text-white font-bold text-[9px] uppercase tracking-widest active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
                 Browse FZ Inventory Report
               </button>
             </div>
@@ -1075,15 +1075,15 @@ export default function FileProcessor() {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             className="bg-white border-2 border-slate-900 flex flex-col"
           >
-            <div className="bg-blue-600 p-4 flex justify-between items-center border-b-2 border-slate-900">
+            <div className="bg-blue-600 p-3 sm:p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b-2 border-slate-900">
               <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-3">
                 <span className="w-2 h-2 bg-white rounded-full"></span>
                 Extracted Data Preview
               </h3>
-              <div className="flex gap-4">
+              <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-end">
                 <button 
                   onClick={() => { setExtractedData(null); setResolutions({}); }}
-                  className="px-6 py-2 bg-white border-2 border-slate-900 text-slate-900 text-[10px] font-bold uppercase transition-all active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                  className="px-4 sm:px-6 py-2 bg-white border-2 border-slate-900 text-slate-900 text-[10px] font-bold uppercase transition-all active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
                 >
                   Discard
                 </button>
@@ -1091,7 +1091,7 @@ export default function FileProcessor() {
                   onClick={handleConfirm}
                   disabled={pendingVerificationCount > 0}
                   className={cn(
-                    "px-8 py-2 border-2 border-slate-900 text-[10px] font-bold uppercase transition-all active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+                    "px-5 sm:px-8 py-2 border-2 border-slate-900 text-[10px] font-bold uppercase transition-all active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
                     pendingVerificationCount > 0 
                       ? "bg-slate-300 text-slate-500 border-slate-400 cursor-not-allowed shadow-none" 
                       : "bg-emerald-500 text-white hover:bg-emerald-600"
@@ -1102,7 +1102,7 @@ export default function FileProcessor() {
               </div>
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 border-b-2 border-slate-900 bg-slate-50">
+            <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 border-b-2 border-slate-900 bg-slate-50">
               <div className="space-y-4">
                 <div>
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block font-mono">
@@ -1234,8 +1234,8 @@ export default function FileProcessor() {
               </div>
             )}
 
-            <div className="max-h-[420px] overflow-y-auto p-4 bg-slate-50">
-              <table className="w-full text-left border-collapse bg-white border-2 border-slate-900">
+            <div className="max-h-[420px] overflow-y-auto overflow-x-auto p-2 sm:p-4 bg-slate-50 w-full">
+              <table className="w-full min-w-[760px] text-left border-collapse bg-white border-2 border-slate-900">
                 <thead className="sticky top-0 bg-slate-900 text-white z-10">
                   <tr>
                     <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">LN</th>
