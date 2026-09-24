@@ -68,31 +68,31 @@ export function HoldToConfirmButton({
       onTouchStart={startHold}
       onTouchEnd={stopHold}
       className={cn(
-        "relative overflow-hidden border-2 border-slate-900 font-black uppercase text-xs tracking-[0.2em] transition-all active:translate-y-1 select-none",
-        isHolding ? "scale-[0.98]" : "neo-brutalism-shadow",
+        "relative overflow-hidden rounded-2xl border border-red-500/30 font-bold uppercase text-xs tracking-wider transition-all select-none shadow-sm cursor-pointer",
+        isHolding ? "scale-[0.98] shadow-inner" : "hover:shadow-md hover:border-red-500/50",
         className
       )}
       disabled={isProcessing}
     >
-      <div className="relative z-10 px-8 py-5 flex items-center justify-between gap-4">
+      <div className="relative z-10 px-6 py-4 flex items-center justify-between gap-4">
         <div className="text-left">
-          <p>{isProcessing ? "Executing..." : label}</p>
+          <p className="font-bold">{isProcessing ? "Executing..." : label}</p>
           {subLabel && !isHolding && !isProcessing && (
-            <p className="text-[8px] opacity-40 font-bold mt-1">{subLabel}</p>
+            <p className="text-[10px] opacity-70 font-medium mt-0.5">{subLabel}</p>
           )}
           {isHolding && (
-            <p className="text-[8px] font-bold mt-1 text-white mix-blend-difference">Release to cancel... {Math.ceil((100 - progress) / 33)}s</p>
+            <p className="text-[10px] font-bold mt-0.5 text-white">ปล่อยเพื่อยกเลิก... {Math.ceil((100 - progress) / 33)}s</p>
           )}
         </div>
         {isProcessing ? (
           <Loader2 className="w-5 h-5 animate-spin" />
         ) : (
-          <AlertTriangle className={cn("w-5 h-5", isHolding ? "animate-pulse" : "opacity-20")} />
+          <AlertTriangle className={cn("w-5 h-5 transition-transform", isHolding ? "animate-pulse scale-110" : "opacity-40")} />
         )}
       </div>
 
       <motion.div
-        className="absolute left-0 top-0 bottom-0 bg-slate-900/10 pointer-events-none"
+        className="absolute left-0 top-0 bottom-0 bg-red-600/30 backdrop-blur-sm pointer-events-none"
         initial={{ width: 0 }}
         animate={{ width: `${progress}%` }}
         transition={{ duration: 0.1 }}

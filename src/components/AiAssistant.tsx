@@ -431,30 +431,30 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
 
   return (
     <div 
-      className="flex flex-col h-full bg-slate-50 border-4 border-slate-900 neo-brutalism-shadow overflow-hidden select-none"
+      className="flex flex-col h-full bg-white/60 backdrop-blur-2xl border border-white/70 rounded-3xl shadow-xl overflow-hidden select-none relative"
       onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
       onDragLeave={() => setIsDragging(false)}
       onDrop={handleDrop}
     >
       {/* Top Header */}
-      <div className="bg-slate-900 text-white px-5 py-3.5 border-b-2 border-slate-900 flex items-center justify-between shrink-0">
+      <div className="bg-white/70 backdrop-blur-xl px-5 py-3.5 border-b border-white/60 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-amber-400 text-slate-950 border-2 border-white flex items-center justify-center font-black">
-            <Sparkles className="w-5 h-5 text-slate-950" />
+          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-300 text-slate-900 border border-white/60 shadow-md shadow-amber-400/20 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 fill-slate-900 text-slate-900" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-black uppercase tracking-wider">AI INVENTORY ASSISTANT</h3>
-              <span className="text-[9px] bg-emerald-500 text-slate-950 font-mono font-bold px-1.5 py-0.2 border border-white">
-                LIVE_GROUNDED
+              <h3 className="text-sm font-bold tracking-tight text-slate-900">AI Inventory Assistant</h3>
+              <span className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                LIVE
               </span>
             </div>
-            <p className="text-[10px] text-slate-300 font-mono flex items-center gap-2">
-              <span>ฐานข้อมูล: {summary.totalItems} รายการ</span>
+            <p className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+              <span>ฐานข้อมูล {summary.totalItems} รายการ</span>
               <span>•</span>
-              <span className="text-emerald-400">ในคลัง: {summary.inCount}</span>
+              <span className="text-emerald-600 font-medium">ในคลัง {summary.inCount}</span>
               <span>•</span>
-              <span className="text-amber-300">เบิกออก: {summary.outCount}</span>
+              <span className="text-amber-600 font-medium">เบิกออก {summary.outCount}</span>
             </p>
           </div>
         </div>
@@ -462,7 +462,7 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
         <div className="flex items-center gap-2">
           <button
             onClick={handleClearHistory}
-            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-red-400 border border-slate-700 text-[10px] flex items-center gap-1 font-mono uppercase cursor-pointer"
+            className="px-3 py-1.5 rounded-full bg-white/70 hover:bg-white text-slate-600 hover:text-rose-600 border border-slate-200/60 text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer active:scale-95"
             title="ล้างแชท"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -471,7 +471,7 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 bg-white hover:bg-red-500 hover:text-white text-slate-900 border-2 border-slate-900 cursor-pointer"
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -481,25 +481,25 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
 
       {/* Drag & Drop Alert Overlay */}
       {isDragging && (
-        <div className="absolute inset-0 bg-blue-600/90 text-white z-50 flex flex-col items-center justify-center p-8 border-4 border-dashed border-white">
+        <div className="absolute inset-0 bg-blue-600/80 backdrop-blur-md text-white z-50 flex flex-col items-center justify-center p-8 rounded-3xl">
           <FileSpreadsheet className="w-16 h-16 animate-bounce mb-3" />
-          <p className="text-xl font-black uppercase tracking-wider">วางไฟล์ของคุณที่นี่</p>
-          <p className="text-xs font-mono opacity-90 mt-1">รองรับ Excel (.xlsx, .xls), CSV และ Text Files</p>
+          <p className="text-xl font-bold tracking-tight">วางไฟล์ของคุณที่นี่</p>
+          <p className="text-xs text-blue-100 mt-1">รองรับ Excel (.xlsx, .xls), CSV และ Text Files</p>
         </div>
       )}
 
       {/* Paste Text Modal */}
       {isPastingText && (
-        <div className="fixed inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-white border-4 border-slate-900 max-w-lg w-full p-5 space-y-4 shadow-[6px_6px_0px_0px_rgba(15,23,42,1)]">
-            <div className="flex justify-between items-center border-b-2 border-slate-900 pb-2">
-              <h4 className="font-black text-sm uppercase flex items-center gap-2">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white/90 backdrop-blur-2xl border border-white/80 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-slate-200/60 pb-3">
+              <h4 className="font-bold text-sm text-slate-900 flex items-center gap-2">
                 <ClipboardPaste className="w-4 h-4 text-blue-600" />
                 วางข้อความ / ตารางที่ต้องการให้ AI ตรวจสอบ
               </h4>
               <button 
                 onClick={() => setIsPastingText(false)}
-                className="p-1 hover:bg-slate-100 border border-slate-900"
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -509,20 +509,20 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
               value={pastedRawText}
               onChange={(e) => setPastedRawText(e.target.value)}
               placeholder="คัดลอกตารางจาก Excel, ข้อความรายการเบิก, หรือ PO มาวางที่นี่..."
-              className="w-full p-3 border-2 border-slate-900 font-mono text-xs focus:outline-none focus:border-blue-600 bg-slate-50"
+              className="w-full p-3.5 rounded-2xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 font-mono text-xs focus:outline-none bg-slate-50/60"
             />
             <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setIsPastingText(false)}
-                className="px-3 py-1.5 border border-slate-900 text-xs font-bold hover:bg-slate-100"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
               >
                 ยกเลิก
               </button>
               <button
                 type="button"
                 onClick={handleApplyPastedText}
-                className="px-4 py-1.5 bg-blue-600 text-white font-bold text-xs uppercase border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold text-xs shadow-md shadow-blue-500/20 active:scale-95 transition-all"
               >
                 นำเข้าข้อมูลสู่แชท
               </button>
@@ -540,39 +540,39 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
               key={msg.id}
               className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
             >
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-mono font-bold text-slate-400">
+              <div className="flex items-center gap-2 mb-1 px-1">
+                <span className="text-[10px] font-medium text-slate-400">
                   {isUser ? 'YOU' : 'AI ASSISTANT'} • {msg.timestamp}
                 </span>
               </div>
 
-              {/* Message Bubble */}
+              {/* iOS Message Bubble */}
               <div
-                className={`max-w-[88%] md:max-w-[80%] p-4 border-2 border-slate-900 text-xs font-sans leading-relaxed select-text ${
+                className={`max-w-[88%] md:max-w-[80%] p-4 text-xs font-sans leading-relaxed select-text ${
                   isUser
-                    ? 'bg-blue-600 text-white shadow-[3px_3px_0px_0px_rgba(15,23,42,1)]'
-                    : 'bg-white text-slate-900 shadow-[3px_3px_0px_0px_rgba(15,23,42,1)]'
+                    ? 'rounded-3xl rounded-br-md bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md shadow-blue-500/25 border border-white/20'
+                    : 'rounded-3xl rounded-bl-md bg-white/80 backdrop-blur-xl text-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.04)] border border-white/80'
                 }`}
               >
                 {/* Attached File Pill in message */}
                 {msg.attachedFileName && (
-                  <div className="mb-2.5 pb-2 border-b border-blue-400/50 flex items-center gap-2 text-[10px] font-mono font-black bg-blue-700/50 px-2 py-1">
+                  <div className="mb-2.5 pb-2 border-b border-blue-400/40 flex items-center gap-2 text-[10px] font-medium bg-blue-700/30 rounded-lg px-2.5 py-1">
                     <FileSpreadsheet className="w-3.5 h-3.5" />
                     <span>แนบไฟล์: {msg.attachedFileName}</span>
                   </div>
                 )}
 
                 {/* Content */}
-                <div className="prose prose-xs max-w-none text-inherit prose-headings:font-black prose-headings:text-inherit prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1.5 prose-strong:text-inherit prose-strong:font-black prose-table:border-collapse prose-table:my-2 prose-th:border prose-th:border-slate-800 prose-th:p-1 prose-th:bg-slate-100 prose-td:border prose-td:border-slate-300 prose-td:p-1">
+                <div className="prose prose-xs max-w-none text-inherit prose-headings:font-bold prose-headings:text-inherit prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1.5 prose-strong:text-inherit prose-strong:font-bold prose-table:border-collapse prose-table:my-2 prose-th:p-1.5 prose-th:bg-black/5 prose-td:border prose-td:border-black/10 prose-td:p-1.5">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
 
                 {/* Copy Button for Model */}
                 {!isUser && (
-                  <div className="mt-3 pt-2 border-t border-slate-200 flex justify-end">
+                  <div className="mt-3 pt-2 border-t border-slate-200/50 flex justify-end">
                     <button
                       onClick={() => handleCopy(msg.id, msg.content)}
-                      className="text-[10px] font-mono font-bold flex items-center gap-1 text-slate-500 hover:text-slate-900 transition-colors"
+                      className="text-[10px] font-medium flex items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
                     >
                       {copiedMsgId === msg.id ? (
                         <>
@@ -596,9 +596,9 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
         {/* Loading Indicator */}
         {isLoading && (
           <div className="flex items-start gap-2">
-            <div className="p-3 bg-white border-2 border-slate-900 text-xs shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] flex items-center gap-2">
+            <div className="p-3.5 rounded-2xl bg-white/80 backdrop-blur-xl border border-white/80 text-xs shadow-sm flex items-center gap-2.5">
               <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
-              <span className="font-bold font-mono text-slate-700">กำลังวิเคราะห์ข้อมูลกับคลังสินค้า...</span>
+              <span className="font-medium text-slate-600">กำลังวิเคราะห์ข้อมูลกับคลังสินค้า...</span>
             </div>
           </div>
         )}
@@ -607,15 +607,15 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
       </div>
 
       {/* Suggested Quick Action Chips */}
-      <div className="px-4 py-2 bg-slate-100 border-t-2 border-slate-900 flex items-center gap-1.5 overflow-x-auto shrink-0 scrollbar-none">
-        <span className="text-[9px] font-black uppercase text-slate-500 font-mono shrink-0 flex items-center gap-1">
+      <div className="px-4 py-2.5 bg-white/40 backdrop-blur-md border-t border-white/60 flex items-center gap-2 overflow-x-auto shrink-0 scrollbar-none">
+        <span className="text-[10px] font-semibold text-slate-500 shrink-0 flex items-center gap-1">
           <HelpCircle className="w-3 h-3 text-blue-600" /> คำถามด่วน:
         </span>
 
         <button
           type="button"
           onClick={() => handleSendMessage('ตรวจสอบสินค้าที่มีจำนวนคงเหลือน้อย (Low Stock) และแนะนำการจัดเตรียม')}
-          className="px-2.5 py-1 bg-white border border-slate-900 hover:bg-amber-100 font-sans text-[10px] font-bold text-slate-800 shrink-0 shadow-[1px_1px_0px_0px_rgba(15,23,42,1)] cursor-pointer"
+          className="px-3 py-1.5 rounded-full bg-white/70 hover:bg-white border border-slate-200/60 text-[11px] font-medium text-slate-700 shrink-0 shadow-sm backdrop-blur-md cursor-pointer transition-all active:scale-95"
         >
           🚨 สินค้าใกล้หมด
         </button>
@@ -623,7 +623,7 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
         <button
           type="button"
           onClick={() => handleSendMessage('สรุปยอดสินค้าและสถานที่จัดเก็บ (Location) ทั้งหมดว่ามีของอยู่ที่ไหนบ้าง')}
-          className="px-2.5 py-1 bg-white border border-slate-900 hover:bg-blue-100 font-sans text-[10px] font-bold text-slate-800 shrink-0 shadow-[1px_1px_0px_0px_rgba(15,23,42,1)] cursor-pointer"
+          className="px-3 py-1.5 rounded-full bg-white/70 hover:bg-white border border-slate-200/60 text-[11px] font-medium text-slate-700 shrink-0 shadow-sm backdrop-blur-md cursor-pointer transition-all active:scale-95"
         >
           📍 สรุปตาม Location
         </button>
@@ -631,7 +631,7 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
         <button
           type="button"
           onClick={() => handleSendMessage('สรุปภาพรวมสถานะสินค้า IN และ OUT ล่าสุด พร้อมข้อสังเกต')}
-          className="px-2.5 py-1 bg-white border border-slate-900 hover:bg-emerald-100 font-sans text-[10px] font-bold text-slate-800 shrink-0 shadow-[1px_1px_0px_0px_rgba(15,23,42,1)] cursor-pointer"
+          className="px-3 py-1.5 rounded-full bg-white/70 hover:bg-white border border-slate-200/60 text-[11px] font-medium text-slate-700 shrink-0 shadow-sm backdrop-blur-md cursor-pointer transition-all active:scale-95"
         >
           📊 สรุปภาพรวมสต็อก
         </button>
@@ -639,7 +639,7 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
         <button
           type="button"
           onClick={() => setIsPastingText(true)}
-          className="px-2.5 py-1 bg-amber-300 border border-slate-900 hover:bg-amber-400 font-sans text-[10px] font-black text-slate-900 shrink-0 shadow-[1px_1px_0px_0px_rgba(15,23,42,1)] cursor-pointer flex items-center gap-1"
+          className="px-3 py-1.5 rounded-full bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/40 text-[11px] font-semibold text-amber-800 shrink-0 shadow-sm backdrop-blur-md cursor-pointer flex items-center gap-1.5 active:scale-95 transition-all"
         >
           <ClipboardPaste className="w-3 h-3" />
           วางข้อมูลมาเทียบ
@@ -648,12 +648,12 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
 
       {/* Attached File Preview Bar */}
       {attachedFile && (
-        <div className="px-4 py-2 bg-amber-100 border-t-2 border-slate-900 flex items-center justify-between shrink-0">
+        <div className="px-4 py-2.5 bg-amber-50/80 backdrop-blur-md border-t border-amber-200/60 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 overflow-hidden">
-            <FileSpreadsheet className="w-4 h-4 text-amber-700 shrink-0" />
+            <FileSpreadsheet className="w-4 h-4 text-amber-600 shrink-0" />
             <div className="truncate text-xs">
-              <span className="font-bold text-slate-900">{attachedFile.name}</span>
-              <span className="text-[10px] font-mono text-slate-500 ml-2">
+              <span className="font-semibold text-slate-800">{attachedFile.name}</span>
+              <span className="text-[10px] text-slate-500 ml-2">
                 ({attachedFile.rowCount ? `${attachedFile.rowCount} แถว` : `${(attachedFile.size / 1024).toFixed(1)} KB`})
               </span>
             </div>
@@ -661,15 +661,15 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
           <button
             type="button"
             onClick={() => setAttachedFile(null)}
-            className="p-1 hover:bg-amber-200 text-slate-700 cursor-pointer"
+            className="w-6 h-6 rounded-full bg-amber-200/60 hover:bg-amber-200 text-slate-700 flex items-center justify-center cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* Input Area */}
-      <div className="p-3 md:p-4 bg-white border-t-2 border-slate-900 shrink-0">
+      {/* Input Area (iOS Floating Pill) */}
+      <div className="p-3 md:p-4 bg-white/70 backdrop-blur-2xl border-t border-white/60 shrink-0">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -690,7 +690,7 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="p-2.5 border-2 border-slate-900 bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer shrink-0 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+            className="p-2.5 rounded-xl bg-white/80 hover:bg-white text-slate-600 hover:text-slate-900 border border-slate-200/60 cursor-pointer shrink-0 shadow-sm active:scale-95 transition-all"
             title="แนบไฟล์ Excel, CSV หรือ Text เพื่อให้ AI วิเคราะห์"
           >
             <Paperclip className="w-4 h-4" />
@@ -700,7 +700,7 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
           <button
             type="button"
             onClick={() => setIsPastingText(true)}
-            className="p-2.5 border-2 border-slate-900 bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer shrink-0 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 hidden sm:block"
+            className="p-2.5 rounded-xl bg-white/80 hover:bg-white text-slate-600 hover:text-slate-900 border border-slate-200/60 cursor-pointer shrink-0 shadow-sm active:scale-95 transition-all hidden sm:block"
             title="คัดลอกข้อความหรือตารางมาวาง"
           >
             <ClipboardPaste className="w-4 h-4" />
@@ -711,19 +711,19 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
             type="text"
             value={inputQuery}
             onChange={(e) => setInputQuery(e.target.value)}
-            placeholder={attachedFile ? `ถามคำถามเกี่ยวกับไฟล์ "${attachedFile.name}" หรือกดส่งเลย...` : 'พิมพ์คำถาม เช่น มีพาร์ท 1234 อยู่ที่ไหน หรือลากไฟล์มาวาง...'}
+            placeholder={attachedFile ? `ถามเกี่ยวกับไฟล์ "${attachedFile.name}" หรือกดส่งเลย...` : 'พิมพ์ถามสต็อก เช่น มีพาร์ท 1234 อยู่ที่ไหน หรือลากไฟล์มาวาง...'}
             disabled={isLoading}
-            className="flex-1 px-3 py-2 border-2 border-slate-900 font-sans text-xs font-bold focus:outline-none focus:border-blue-600 bg-slate-50"
+            className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200/80 bg-white/80 backdrop-blur-md font-sans text-xs focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
           />
 
           {/* Send Button */}
           <button
             type="submit"
             disabled={isLoading || (!inputQuery.trim() && !attachedFile)}
-            className={`px-4 py-2 border-2 border-slate-900 font-black text-xs uppercase flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 shrink-0 ${
+            className={`px-4 py-2.5 rounded-2xl font-bold text-xs uppercase flex items-center gap-1.5 cursor-pointer shadow-md transition-all active:scale-95 shrink-0 ${
               isLoading || (!inputQuery.trim() && !attachedFile)
-                ? 'bg-slate-200 text-slate-400 border-slate-400 cursor-not-allowed shadow-none'
-                : 'bg-amber-400 hover:bg-amber-500 text-slate-950'
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white shadow-blue-500/25'
             }`}
           >
             <Send className="w-3.5 h-3.5" />
@@ -731,9 +731,9 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
           </button>
         </form>
 
-        <div className="flex justify-between items-center mt-2 px-1 text-[9.5px] font-mono text-slate-400">
+        <div className="flex justify-between items-center mt-2 px-1 text-[10px] text-slate-400">
           <span>💡 สามารถลากไฟล์ Excel / CSV มาปล่อยลงหน้านี้ได้โดยตรง</span>
-          <span className="hidden md:inline text-emerald-600 font-bold">Google Gemini 3.8 Flash • Real-time Grounded</span>
+          <span className="hidden md:inline text-emerald-600 font-medium">Google Gemini 3.8 Flash • Real-time Grounded</span>
         </div>
       </div>
     </div>

@@ -828,31 +828,31 @@ export default function FileProcessor() {
     <div className="space-y-8 max-w-5xl mx-auto">
       {!extractedData && !fzExtractedData && (
         <>
-          {/* 🟢 Select Upload Mode Toggle Segmented Control */}
-          <div className="bg-white border-2 border-slate-900 p-5 neo-brutalism-shadow space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block font-mono">
-              ขั้นตอนที่ 1: เลือกเมนูสินค้าใน INVOICE (CHOOSE CIPL DIRECTION VALUE)
+          {/* 🟢 Select Upload Mode Toggle Segmented Control (iOS Liquid Glass) */}
+          <div className="liquid-glass-card p-6 space-y-4">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+              ขั้นตอนที่ 1: เลือกทิศทางสินค้าใน INVOICE (CIPL Direction)
             </label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button
                 type="button"
                 onClick={() => setUploadType('IN')}
                 className={cn(
-                  "flex flex-col sm:flex-row items-center justify-start gap-4 p-4 border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 text-left",
+                  "flex flex-col sm:flex-row items-center justify-start gap-4 p-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer text-left border shadow-sm active:scale-[0.98]",
                   uploadType === 'IN'
-                    ? "bg-emerald-50 border-emerald-600 text-emerald-800 ring-2 ring-emerald-600/30"
-                    : "bg-white border-slate-300 hover:border-slate-800 text-slate-600"
+                    ? "bg-emerald-50/90 border-emerald-500/40 text-emerald-800 ring-2 ring-emerald-500/20 shadow-emerald-500/10"
+                    : "bg-white/60 hover:bg-white border-slate-200/80 text-slate-600"
                 )}
               >
                 <div className={cn(
-                  "p-2 border shrink-0 flex items-center justify-center rounded-none",
-                  uploadType === 'IN' ? "border-emerald-600 bg-emerald-100 text-emerald-700" : "border-slate-300 bg-slate-50 text-slate-400"
+                  "p-2.5 rounded-xl border shrink-0 flex items-center justify-center",
+                  uploadType === 'IN' ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-700" : "border-slate-200 bg-slate-100/70 text-slate-400"
                 )}>
                   <ArrowDownLeft className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="block text-[11px] font-black tracking-wide">ของเข้าคลัง (INCOMING / IMPORT)</span>
-                  <span className="text-[9px] font-medium text-slate-400 block tracking-normal normal-case mt-0.5 font-mono">
+                  <span className="block text-xs font-bold tracking-wide text-slate-900">ของเข้าคลัง (Incoming / Import)</span>
+                  <span className="text-[10px] font-normal text-slate-500 block tracking-normal normal-case mt-0.5">
                     สแกนเข้าระบบจัดเก็บคลังหลัก / สถานะสินค้าเปลี่ยนเป็น IN
                   </span>
                 </div>
@@ -862,22 +862,22 @@ export default function FileProcessor() {
                 type="button"
                 onClick={() => setUploadType('OUT')}
                 className={cn(
-                  "flex flex-col sm:flex-row items-center justify-start gap-4 p-4 border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 text-left",
+                  "flex flex-col sm:flex-row items-center justify-start gap-4 p-4 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer text-left border shadow-sm active:scale-[0.98]",
                   uploadType === 'OUT'
-                    ? "bg-red-50 border-red-600 text-red-800 ring-2 ring-red-600/30"
-                    : "bg-white border-slate-300 hover:border-slate-800 text-slate-600"
+                    ? "bg-rose-50/90 border-rose-500/40 text-rose-800 ring-2 ring-rose-500/20 shadow-rose-500/10"
+                    : "bg-white/60 hover:bg-white border-slate-200/80 text-slate-600"
                 )}
               >
                 <div className={cn(
-                  "p-2 border shrink-0 flex items-center justify-center rounded-none",
-                  uploadType === 'OUT' ? "border-red-600 bg-red-100 text-red-700" : "border-slate-300 bg-slate-50 text-slate-400"
+                  "p-2.5 rounded-xl border shrink-0 flex items-center justify-center",
+                  uploadType === 'OUT' ? "border-rose-500/30 bg-rose-500/20 text-rose-700" : "border-slate-200 bg-slate-100/70 text-slate-400"
                 )}>
                   <ArrowUpRight className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="block text-[11px] font-black tracking-wide">ของออก / ส่งไปต่างประเทศ (OUTGOING / EXPORT)</span>
-                  <span className="text-[9px] font-medium text-slate-400 block tracking-normal normal-case mt-0.5 font-mono">
-                    สินค้าเตรียมส่งออกต่างประเทศ / สถานะสินค้าเป็น OUT
+                  <span className="block text-xs font-bold tracking-wide text-slate-900">ของออก / ส่งไปต่างประเทศ (Outgoing / Export)</span>
+                  <span className="text-[10px] font-normal text-slate-500 block tracking-normal normal-case mt-0.5">
+                    สินค้าเตรียมส่งออกต่างประเทศ / สถานะสินค้าเปลี่ยนเป็น OUT
                   </span>
                 </div>
               </button>
@@ -887,53 +887,53 @@ export default function FileProcessor() {
           <div 
             {...getRootProps()} 
             className={cn(
-              "border-4 border-dashed p-6 sm:p-12 md:p-16 flex flex-col items-center justify-center transition-all bg-white cursor-pointer",
-              isDragActive ? "border-blue-600 bg-blue-50" : "border-slate-300 hover:border-slate-900",
-              uploadType === 'IN' ? "hover:bg-emerald-50/20" : "hover:bg-red-50/20"
+              "rounded-3xl border-2 border-dashed p-8 sm:p-14 flex flex-col items-center justify-center transition-all bg-white/60 backdrop-blur-xl cursor-pointer shadow-sm",
+              isDragActive ? "border-blue-500 bg-blue-50/80 scale-[1.01]" : "border-slate-300/80 hover:border-blue-400 hover:bg-white/80",
+              uploadType === 'IN' ? "hover:border-emerald-400" : "hover:border-rose-400"
             )}
           >
             <input {...getInputProps()} />
-            <div className="w-12 h-12 sm:w-16 sm:h-16 border-2 border-slate-900 flex items-center justify-center mb-4 sm:mb-6 bg-slate-100">
-              <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-slate-900" />
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-md shadow-blue-500/20 flex items-center justify-center mb-4 text-white">
+              <Upload className="w-6 h-6" />
             </div>
-            <h3 className="text-xs font-black uppercase tracking-widest mb-2 font-sans text-center">
+            <h3 className="text-sm font-bold tracking-tight mb-1 text-slate-900 text-center">
               Upload Shipping Invoice ({uploadType === 'IN' ? 'ของเข้า / INCOMING' : 'ของออก / OUTGOING'})
             </h3>
-            <p className="text-[10px] opacity-40 uppercase tracking-widest text-center max-w-xs font-mono">
-              Supports XLSX, CSV, XLS
+            <p className="text-xs text-slate-400 text-center max-w-xs">
+              รองรับไฟล์ XLSX, CSV, XLS (ลากวางหรือคลิกเพื่อเลือกไฟล์)
             </p>
             <button className={cn(
-              "mt-6 sm:mt-8 px-8 sm:px-12 py-2.5 sm:py-3 text-white font-bold text-[10px] uppercase tracking-widest active-neo-brutalism neo-brutalism-shadow",
-              uploadType === 'IN' ? "bg-emerald-600" : "bg-red-600"
+              "mt-6 px-8 py-2.5 text-white font-semibold text-xs rounded-xl shadow-md active:scale-95 transition-all",
+              uploadType === 'IN' ? "bg-gradient-to-r from-emerald-600 to-emerald-500 shadow-emerald-500/20" : "bg-gradient-to-r from-rose-600 to-rose-500 shadow-rose-500/20"
             )}>
-              Browse Files
+              เลือกไฟล์เอกสาร
             </button>
           </div>
 
           {/* 📦 SCHLUMBERGER - FZ Inventory Report Upload Section */}
-          <div className="bg-white border-2 border-slate-900 p-4 sm:p-5 neo-brutalism-shadow space-y-3 sm:space-y-4">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block font-mono">
-              ข้อมูลประมวลผลรายงานสินค้า Free Zone (SCHLUMBERGER - FZ INVENTORY REPORT)
+          <div className="liquid-glass-card p-6 space-y-4">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+              รายงานสินค้า Free Zone (SCHLUMBERGER - FZ INVENTORY REPORT)
             </label>
             <div 
               {...getFzRootProps()} 
               className={cn(
-                "border-4 border-dashed p-6 sm:p-10 md:p-12 flex flex-col items-center justify-center transition-all bg-slate-50 cursor-pointer",
-                isFzDragActive ? "border-amber-600 bg-amber-50" : "border-slate-300 hover:border-slate-900"
+                "rounded-3xl border-2 border-dashed p-6 sm:p-10 flex flex-col items-center justify-center transition-all bg-white/50 backdrop-blur-md cursor-pointer",
+                isFzDragActive ? "border-amber-500 bg-amber-50/80" : "border-slate-300/80 hover:border-amber-400 hover:bg-white/70"
               )}
             >
               <input {...getFzInputProps()} />
-              <div className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-slate-900 flex items-center justify-center mb-3 sm:mb-4 bg-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
-                <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6 text-slate-900" />
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-400 text-white shadow-md shadow-amber-500/20 flex items-center justify-center mb-3">
+                <FileSpreadsheet className="w-6 h-6" />
               </div>
-              <h4 className="text-[11px] font-black uppercase tracking-widest mb-1 font-sans text-center">
+              <h4 className="text-xs font-bold tracking-tight mb-1 text-slate-900 text-center">
                 SCHLUMBERGER - FZ Inventory Report
               </h4>
-              <p className="text-[9px] opacity-50 uppercase tracking-widest text-center max-w-xs font-mono">
+              <p className="text-[11px] text-slate-400 text-center max-w-xs">
                 สแกนรายงานอัปเดตคลังรายสัปดาห์จากผู้บริหารฟรีโซน (XLSX, CSV, XLS)
               </p>
-              <button className="mt-4 px-6 sm:px-8 py-2 bg-slate-950 text-white font-bold text-[9px] uppercase tracking-widest active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                Browse FZ Inventory Report
+              <button className="mt-4 px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow-md active:scale-95 transition-all">
+                เลือกรายงาน FZ
               </button>
             </div>
           </div>
@@ -968,15 +968,15 @@ export default function FileProcessor() {
         {success && (
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center gap-3 p-12 bg-white border-4 border-slate-900 neo-brutalism-shadow"
+            className="flex flex-col items-center gap-3 p-8 sm:p-12 liquid-glass-card rounded-3xl border border-white/80 shadow-xl"
           >
-            <div className="w-20 h-20 bg-emerald-100 border-2 border-emerald-600 flex items-center justify-center mb-2">
-              <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mb-1 shadow-xs">
+              <CheckCircle2 className="w-8 h-8 text-emerald-600" />
             </div>
-            <h3 className="text-xl font-black uppercase tracking-tight text-slate-900">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 text-center">
               {lastCommitType === 'OUT' ? '✂️ ตัดยอดสต็อกสินค้าในหน้า Inventory เรียบร้อยแล้ว' : '📥 รับเข้าและเพิ่มยอดสต็อกในหน้า Inventory เรียบร้อยแล้ว'}
             </h3>
-            <p className="text-xs font-mono text-slate-600 text-center max-w-lg">
+            <p className="text-xs text-slate-500 text-center max-w-lg">
               {lastCommitType === 'OUT' 
                 ? 'ระบบได้ดำเนินการตัดลดยอดคงเหลือของสินค้าในหน้า Inventory พร้อมบันทึกประวัติ Transaction การเบิกออก/ส่งออก (OUT) เรียบร้อยแล้ว'
                 : 'ระบบได้บันทึกรับเข้าและเพิ่มจำนวนสต็อกของสินค้าในหน้า Inventory เรียบร้อยแล้ว'}
@@ -984,7 +984,7 @@ export default function FileProcessor() {
             <div className="flex gap-3 mt-4">
               <button 
                 onClick={() => setSuccess(false)}
-                className="px-8 py-3 bg-slate-900 text-white text-[10px] uppercase tracking-widest font-black active-neo-brutalism neo-brutalism-shadow"
+                className="glass-button-primary px-6 py-2.5 text-xs font-semibold rounded-xl"
               >
                 อัปโหลดเอกสารอื่นต่อ
               </button>
@@ -995,48 +995,48 @@ export default function FileProcessor() {
         {fzExtractedData && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-white border-2 border-slate-900 flex flex-col"
+            className="liquid-glass-card rounded-3xl border border-white/80 shadow-xl overflow-hidden flex flex-col"
           >
-            <div className="bg-amber-600 p-4 flex justify-between items-center border-b-2 border-slate-900">
-              <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-3">
+            <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/20">
+              <h3 className="text-xs font-bold text-white tracking-wide flex items-center gap-2.5">
                 <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
                 รายงานสินค้า Free Zone (SCHLUMBERGER FZ REPORT PREVIEW)
               </h3>
-              <div className="flex gap-4">
+              <div className="flex gap-2.5 self-end sm:self-auto">
                 <button 
                   onClick={() => { setFzExtractedData(null); }}
-                  className="px-6 py-2 bg-white border-2 border-slate-900 text-slate-900 text-[10px] font-bold uppercase transition-all active-neo-brutalism shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)] hover:bg-slate-50"
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-semibold backdrop-blur-md transition-all border border-white/30"
                 >
                   Discard
                 </button>
                 <button 
                   onClick={handleConfirmFz}
-                  className="px-8 py-2 border-2 border-slate-900 text-[10px] bg-emerald-600 text-white hover:bg-emerald-700 font-bold uppercase transition-all active-neo-brutalism shadow-[1.5px_1.5px_0px_0px_rgba(0,0,0,1)]"
+                  className="px-5 py-2 bg-white text-amber-700 hover:bg-white/95 rounded-xl text-xs font-bold shadow-md transition-all"
                 >
                   Confirm & Commit Report ({fzExtractedData.length} items)
                 </button>
               </div>
             </div>
 
-            <div className="p-4 bg-amber-50/50 border-b-2 border-slate-900 flex items-center gap-2">
-              <AlertCircle className="w-4.5 h-4.5 text-amber-600" />
-              <p className="text-[10px] font-sans text-amber-800 font-bold uppercase tracking-wide">
+            <div className="p-3.5 bg-amber-500/10 border-b border-amber-200/50 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <p className="text-xs font-medium text-amber-800">
                 📄 รายการเหล่านี้จะถูก บันทึก / อัปเดต สู่ Master Inventory โดยอัตโนมัติด้วยสถานะ IN และพิกัดจัดเก็บจัดเป็น Free Zone
               </p>
             </div>
 
-            <div className="max-h-[500px] overflow-y-auto p-4 bg-slate-50">
-              <table className="w-full text-left border-collapse bg-white border-2 border-slate-900">
-                <thead className="sticky top-0 bg-slate-900 text-white select-none">
+            <div className="max-h-[500px] overflow-y-auto p-4 bg-white/30">
+              <table className="w-full text-left border-collapse bg-white/80 backdrop-blur-md rounded-2xl border border-white/60 overflow-hidden">
+                <thead className="sticky top-0 bg-slate-900/90 backdrop-blur-md text-white select-none">
                   <tr>
-                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">Line Item</th>
-                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">Inbound Number</th>
-                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">Inbound Date</th>
-                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest">Description</th>
-                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-center">Unit Type (UOM)</th>
-                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-center">Qty</th>
-                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-center">COO (Value)</th>
-                    <th className="px-4 py-3 text-[10px] uppercase font-black tracking-widest text-center">Segment</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-bold tracking-wider">Line Item</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-bold tracking-wider">Inbound Number</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-bold tracking-wider">Inbound Date</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-bold tracking-wider">Description</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-bold tracking-wider text-center">Unit Type (UOM)</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-bold tracking-wider text-center">Qty</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-bold tracking-wider text-center">COO (Value)</th>
+                    <th className="px-4 py-3 text-[10px] uppercase font-bold tracking-wider text-center">Segment</th>
                   </tr>
                 </thead>
                 <tbody className="text-[11px] font-mono divide-y divide-slate-200">
@@ -1073,17 +1073,17 @@ export default function FileProcessor() {
         {extractedData && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-white border-2 border-slate-900 flex flex-col"
+            className="liquid-glass-card rounded-3xl border border-white/80 shadow-xl overflow-hidden flex flex-col"
           >
-            <div className="bg-blue-600 p-3 sm:p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b-2 border-slate-900">
-              <h3 className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-3">
-                <span className="w-2 h-2 bg-white rounded-full"></span>
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-3 sm:p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-white/20">
+              <h3 className="text-xs font-bold text-white tracking-wide flex items-center gap-2.5">
+                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
                 Extracted Data Preview
               </h3>
-              <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-end">
+              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
                 <button 
                   onClick={() => { setExtractedData(null); setResolutions({}); }}
-                  className="px-4 sm:px-6 py-2 bg-white border-2 border-slate-900 text-slate-900 text-[10px] font-bold uppercase transition-all active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                  className="px-4 sm:px-5 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-semibold backdrop-blur-md transition-all border border-white/30"
                 >
                   Discard
                 </button>
@@ -1091,10 +1091,10 @@ export default function FileProcessor() {
                   onClick={handleConfirm}
                   disabled={pendingVerificationCount > 0}
                   className={cn(
-                    "px-5 sm:px-8 py-2 border-2 border-slate-900 text-[10px] font-bold uppercase transition-all active-neo-brutalism shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+                    "px-5 sm:px-6 py-2 rounded-xl text-xs font-bold transition-all shadow-md",
                     pendingVerificationCount > 0 
-                      ? "bg-slate-300 text-slate-500 border-slate-400 cursor-not-allowed shadow-none" 
-                      : "bg-emerald-500 text-white hover:bg-emerald-600"
+                      ? "bg-white/40 text-slate-500 cursor-not-allowed shadow-none" 
+                      : "bg-white text-blue-700 hover:bg-white/95"
                   )}
                 >
                   {pendingVerificationCount > 0 ? `Verify Needed (${pendingVerificationCount})` : 'Confirm & Commit'}
@@ -1102,10 +1102,10 @@ export default function FileProcessor() {
               </div>
             </div>
 
-            <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 border-b-2 border-slate-900 bg-slate-50">
+            <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 border-b border-white/60 bg-white/40">
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block font-mono">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
                     เลขที่ใบกำกับสินค้า (Invoice Ref No.)
                   </label>
                   <input
@@ -1115,7 +1115,7 @@ export default function FileProcessor() {
                       ...extractedData,
                       header: { ...extractedData.header, invoiceNo: e.target.value }
                     })}
-                    className="w-full px-3 py-2 bg-white border-2 border-slate-900 font-mono text-xs font-black focus:outline-none focus:border-blue-600 rounded-none text-slate-800"
+                    className="w-full glass-input px-3.5 py-2 text-xs font-mono font-bold rounded-xl text-slate-800"
                   />
                 </div>
 

@@ -420,13 +420,13 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
 
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {copyNotification && (
-        <div className="fixed top-6 right-6 bg-slate-900 border-4 border-amber-400 max-w-sm p-4 z-[9999] neo-brutalism-shadow flex items-start gap-3 text-white duration-300">
-          <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+        <div className="fixed top-6 right-6 bg-slate-900/90 backdrop-blur-xl border border-white/20 max-w-sm p-4 z-[9999] rounded-2xl shadow-2xl flex items-start gap-3 text-white duration-300">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-sans text-xs font-black uppercase tracking-wider text-amber-400">คัดลอกข้อมูลสำเร็จ (Copy Successful)</h4>
-            <p className="font-sans text-[11px] font-bold text-slate-200 mt-1">
+            <h4 className="font-sans text-xs font-bold uppercase tracking-wider text-emerald-400">คัดลอกข้อมูลสำเร็จ (Copy Successful)</h4>
+            <p className="font-sans text-xs text-slate-200 mt-1">
               {copyNotification}
             </p>
           </div>
@@ -434,37 +434,42 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
       )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="relative group flex-1 max-w-md">
-          <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 opacity-20 group-focus-within:opacity-100 transition-opacity" />
+          <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
           <input 
             type="text" 
-            placeholder="Search Serial / Part / Desc / Invoice / Segment..."
-            className="pl-12 pr-6 py-4 bg-white border-2 border-slate-900 text-[10px] uppercase tracking-widest focus:outline-none focus:border-blue-600 w-full transition-all font-black"
+            placeholder="ค้นหา Serial / Part / Desc / Invoice / แผนก..."
+            className="pl-11 pr-4 py-3 rounded-2xl bg-white/70 backdrop-blur-md border border-white/80 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 w-full transition-all shadow-sm font-medium"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
-        <div className="flex items-center gap-4 self-end sm:self-auto">
-          <div className="flex items-center gap-1.5 border-2 border-slate-900 bg-white p-1 neo-brutalism-shadow">
+        <div className="flex items-center gap-3 self-end sm:self-auto">
+          {/* iOS Segmented Control for View Mode */}
+          <div className="flex items-center p-1 rounded-2xl bg-white/70 backdrop-blur-md border border-white/80 shadow-sm">
             <button 
               onClick={() => setViewMode('grid')}
               className={cn(
-                "px-2.5 sm:px-3 py-1.5 text-[9px] sm:text-[9.5px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer",
-                viewMode === 'grid' ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100"
+                "px-3 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer",
+                viewMode === 'grid' 
+                  ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md shadow-blue-500/25" 
+                  : "text-slate-600 hover:text-slate-900"
               )}
-              title="มุมมองกรอบเล็ก (เหมาะสำหรับเปิดบนมือถือ ไม่ต้องสไลด์ข้าง)"
+              title="มุมมองกรอบเล็ก (เหมาะสำหรับมือถือ)"
             >
               <LayoutGrid className="w-3.5 h-3.5" />
               <span>กรอบเล็ก</span>
-              <span className="md:hidden text-[7.5px] px-1 py-0.2 bg-amber-400 text-slate-950 font-mono font-black">
+              <span className="md:hidden text-[8px] px-1 py-0.2 bg-amber-400 text-slate-950 font-bold rounded-full">
                 แนะนำ
               </span>
             </button>
             <button 
               onClick={() => setViewMode('table')}
               className={cn(
-                "px-2.5 sm:px-3 py-1.5 text-[9px] sm:text-[9.5px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer",
-                viewMode === 'table' ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100"
+                "px-3 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer",
+                viewMode === 'table' 
+                  ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md shadow-blue-500/25" 
+                  : "text-slate-600 hover:text-slate-900"
               )}
               title="มุมมองตาราง"
             >
@@ -472,37 +477,32 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
               <span>ตาราง</span>
             </button>
           </div>
-
-          <div className="hidden md:flex items-center gap-2">
-            <Filter className="w-4 h-4 opacity-40" />
-            <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Filter_Enabled</span>
-          </div>
         </div>
       </div>
 
-      {/* Filters (Location & Segment) with Neo-brutalism layout */}
-      <div className="bg-white border-2 border-slate-900 p-4 neo-brutalism-shadow space-y-4">
+      {/* Filters (Location & Segment) with iOS Liquid Glass */}
+      <div className="liquid-glass-card p-5 sm:p-6 rounded-3xl border border-white/80 space-y-4 shadow-sm">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Location Filter */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <span className="text-[9.5px] uppercase font-black tracking-widest text-slate-500 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 whitespace-nowrap shrink-0">
               <MapPin className="w-4 h-4 text-blue-600" />
-              สถานที่จัดเก็บ (LOCATION):
+              สถานที่จัดเก็บ (Location):
             </span>
             <div className="relative flex-1">
               <select
                 value={selectedLocation}
                 onChange={(e) => setSelectedLocation(e.target.value)}
-                className="appearance-none px-4 py-2 pr-10 bg-white border-2 border-slate-900 font-mono text-[10px] font-black uppercase focus:outline-none focus:border-blue-600 transition-colors w-full cursor-pointer h-[38px] rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+                className="appearance-none px-4 py-2.5 pr-10 bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-xl font-mono text-xs font-semibold uppercase focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all w-full cursor-pointer h-[40px] text-slate-800 shadow-sm"
               >
-                <option value="ALL">★ สรุปทั้งหมดในระบบ (SHOW ALL LOCATIONS)</option>
+                <option value="ALL">★ สรุปทั้งหมดในระบบ (Show All Locations)</option>
                 {uniqueLocations.map(loc => (
                   <option key={loc} value={loc}>
                     {loc.toUpperCase()}
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-700 border-l-2 border-slate-900">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
                 <Filter className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -510,7 +510,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
             {selectedLocation !== 'ALL' && (
               <button
                 onClick={() => setSelectedLocation('ALL')}
-                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border-2 border-slate-900 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 h-[40px]"
                 title="ล้างส่วนกรองสถานที่"
               >
                 <X className="w-3.5 h-3.5" />
@@ -520,10 +520,10 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
           </div>
 
           {/* Segment Filter */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <span className="text-[9.5px] uppercase font-black tracking-widest text-slate-500 flex items-center gap-1.5 whitespace-nowrap shrink-0">
-              <Activity className="w-4 h-4 text-purple-600" />
-              เซกเมนต์สินค้า (SEGMENT):
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+              <Activity className="w-4 h-4 text-indigo-600" />
+              แผนกสินค้า (Segment):
             </span>
             <div className="relative flex-1">
               <select
@@ -534,9 +534,9 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                     onClearInitialSegment();
                   }
                 }}
-                className="appearance-none px-4 py-2 pr-10 bg-white border-2 border-slate-900 font-mono text-[10px] font-black uppercase focus:outline-none focus:border-blue-600 transition-colors w-full cursor-pointer h-[38px] rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+                className="appearance-none px-4 py-2.5 pr-10 bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-xl font-mono text-xs font-semibold uppercase focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all w-full cursor-pointer h-[40px] text-slate-800 shadow-sm"
               >
-                <option value="ALL">★ เซกเมนต์ทั้งหมดในระบบ (SHOW ALL SEGMENTS)</option>
+                <option value="ALL">★ แผนกทั้งหมดในระบบ (Show All Segments)</option>
                 {selectedSegment !== 'ALL' && !uniqueSegments.includes(selectedSegment) && (
                   <option value={selectedSegment}>
                     {selectedSegment.toUpperCase()}
@@ -548,7 +548,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                   </option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-700 border-l-2 border-slate-900">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
                 <Filter className="w-3.5 h-3.5" />
               </div>
             </div>
@@ -559,7 +559,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                   setSelectedSegment('ALL');
                   if (onClearInitialSegment) onClearInitialSegment();
                 }}
-                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border-2 border-slate-900 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 h-[40px]"
                 title="ล้างส่วนกรองเซกเมนต์"
               >
                 <X className="w-3.5 h-3.5" />
@@ -570,8 +570,8 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
         </div>
 
         {/* Dynamic Options and Summary Action Toolbar */}
-        <div className="pt-2 border-t border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="pt-3 border-t border-slate-200/60 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={() => {
                 const tsv = generateItemsTSV(filtered);
@@ -585,20 +585,20 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                     alert('ไม่สามารถคัดลอกข้อมูลอัตโนมัติได้ กรุณาลองใหม่อีกครั้ง');
                   });
               }}
-              className="px-4 py-2 border-2 border-slate-900 bg-amber-400 hover:bg-amber-500 text-slate-900 font-extrabold text-[9px] uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+              className="px-4 py-2 rounded-xl bg-white/80 hover:bg-white text-slate-700 font-semibold text-xs border border-white/80 shadow-sm active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 h-[38px]"
               title="คัดลอกข้อมูลตารางเพื่อไปวางใน Excel (Copy for Excel Paste)"
             >
-              <Check className="w-3.5 h-3.5 text-slate-950" />
-              <span>คัดลอกข้อมูลสำหรับวาง Excel ({filtered.length})</span>
+              <Check className="w-3.5 h-3.5 text-blue-600" />
+              <span>คัดลอกสำหรับ Excel ({filtered.length})</span>
             </button>
 
             <button
               onClick={() => exportItemsToExcel(filtered, `inventory_${selectedLocation.toLowerCase()}_${selectedSegment.toLowerCase()}_export.xlsx`)}
-              className="px-4 py-2 border-2 border-slate-900 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
-              title="ส่งออกรายการสินค้าทั้งหมดที่แสดงอยู่ในตัวกรองนี้ไปยังไฟล์ Excel (Download Filtered File)"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-600 text-white font-semibold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 h-[38px]"
+              title="ส่งออกรายการสินค้าทั้งหมดไปยังไฟล์ Excel"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>ดาวน์โหลดไฟล์ Excel</span>
+              <span>ดาวน์โหลด Excel</span>
             </button>
 
             <button
@@ -632,77 +632,77 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                 });
                 setIsManualAddOpen(true);
               }}
-              className="px-4 py-2 border-2 border-slate-900 bg-blue-600 hover:bg-blue-700 text-white font-black text-[9px] uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 h-[38px] shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white font-semibold text-xs shadow-md shadow-blue-500/25 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 h-[38px]"
               title="เพิ่มรายการสินค้าใหม่เข้าสู่คลังแบบกรอกเอง (Add Item Manually)"
             >
-              <Package className="w-3.5 h-3.5" />
-              <span>เพิ่มสินค้าด้วยตัวเอง (Manual Add)</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>เพิ่มสินค้า (Manual Add)</span>
             </button>
           </div>
 
           <div className="text-left md:text-right shrink-0">
-            <span className="text-[8px] uppercase font-black text-slate-400 block tracking-[0.2em] mb-0.5">Matched count</span>
-            <span className="text-xs font-black font-mono text-slate-800 bg-slate-50 px-2.5 py-1.5 border border-slate-200 block min-w-[70px] text-center">
+            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider mb-0.5">Matched count</span>
+            <span className="text-xs font-bold font-mono text-slate-800 bg-white/80 px-3 py-1.5 rounded-xl border border-white/80 block min-w-[70px] text-center shadow-sm">
               {filtered.length} / {items.length} รายการ
             </span>
           </div>
         </div>
       </div>
 
-      <div className="bg-white border-2 border-slate-900 neo-brutalism-shadow overflow-hidden">
+      <div className="liquid-glass-card rounded-3xl border border-white/80 shadow-md overflow-hidden">
         {viewMode === 'table' ? (
           <div>
             {/* Mobile notification for table mode with 1-click switch to grid */}
-            <div className="md:hidden bg-amber-100 border-b-2 border-slate-900 p-2.5 px-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 text-[9.5px] font-bold text-slate-900">
+            <div className="md:hidden bg-amber-500/10 backdrop-blur-md border-b border-amber-500/20 p-2.5 px-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-900">
                 <span>📱 กำลังแสดงแบบตาราง (สไลด์ข้างเพื่อดูข้อมูล)</span>
               </div>
               <button
                 onClick={() => setViewMode('grid')}
-                className="px-2.5 py-1 bg-slate-900 text-white font-black text-[9px] uppercase tracking-wider flex items-center gap-1 shrink-0 shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 shrink-0 shadow-sm cursor-pointer active:scale-95 transition-all"
               >
-                <LayoutGrid className="w-3 h-3 text-amber-400" />
+                <LayoutGrid className="w-3 h-3 text-slate-950" />
                 <span>เปลี่ยนเป็นกรอบเล็ก</span>
               </button>
             </div>
             <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-900 text-white border-b-2 border-slate-900">
-                  <th className="px-4 py-4 w-12 text-center select-none font-black text-[10px] uppercase">
+                <tr className="bg-white/75 backdrop-blur-md text-slate-500 border-b border-slate-200/60">
+                  <th className="px-4 py-3.5 w-12 text-center select-none font-semibold text-[10px] uppercase">
                     <button 
                       onClick={(e) => { e.stopPropagation(); toggleSelectAll(); }}
-                      className="p-1 text-white hover:text-emerald-400 font-black cursor-pointer"
+                      className="p-1 text-slate-400 hover:text-blue-600 cursor-pointer"
                       title="เลือกทั้งหมด"
                     >
                       {allFilteredAreSelected ? (
-                        <CheckSquare className="w-4.5 h-4.5 text-emerald-400" />
+                        <CheckSquare className="w-4.5 h-4.5 text-blue-600" />
                       ) : someFilteredAreSelected ? (
-                        <div className="w-4.5 h-4.5 border-2 border-amber-400 bg-amber-400/20 flex items-center justify-center">
-                          <div className="w-2.5 h-1 bg-amber-400 animate-pulse" />
+                        <div className="w-4.5 h-4.5 rounded border border-blue-500 bg-blue-500/20 flex items-center justify-center">
+                          <div className="w-2 h-1 bg-blue-600 rounded-sm" />
                         </div>
                       ) : (
-                        <Square className="w-4.5 h-4.5" />
+                        <Square className="w-4.5 h-4.5 text-slate-300" />
                       )}
                     </button>
                   </th>
-                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200">IBASE</th>
-                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200 text-center">Line Item</th>
-                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200">Part No.</th>
-                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200">Serial No.</th>
-                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200">Description</th>
-                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200 text-center">QTY</th>
-                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200 text-center">Status / Location</th>
-                  <th className="px-4 py-4 text-[10px] uppercase font-black tracking-widest text-slate-200 text-center">จัดการสต็อก (IN-OUT)</th>
+                  <th className="px-4 py-3.5 text-[10px] uppercase font-bold tracking-wider text-slate-500">IBASE</th>
+                  <th className="px-4 py-3.5 text-[10px] uppercase font-bold tracking-wider text-slate-500 text-center">Line</th>
+                  <th className="px-4 py-3.5 text-[10px] uppercase font-bold tracking-wider text-slate-500">Part No.</th>
+                  <th className="px-4 py-3.5 text-[10px] uppercase font-bold tracking-wider text-slate-500">Serial No.</th>
+                  <th className="px-4 py-3.5 text-[10px] uppercase font-bold tracking-wider text-slate-500">Description</th>
+                  <th className="px-4 py-3.5 text-[10px] uppercase font-bold tracking-wider text-slate-500 text-center">QTY</th>
+                  <th className="px-4 py-3.5 text-[10px] uppercase font-bold tracking-wider text-slate-500 text-center">Status / Location</th>
+                  <th className="px-4 py-3.5 text-[10px] uppercase font-bold tracking-wider text-slate-500 text-center">จัดการสต็อก (IN-OUT)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-slate-100">
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="p-24 text-center">
-                      <div className="flex flex-col items-center gap-2 opacity-20">
-                        <Package className="w-16 h-16" />
-                        <p className="text-sm uppercase font-black tracking-widest">Data_Buffer_Empty</p>
+                      <div className="flex flex-col items-center gap-2 opacity-30">
+                        <Package className="w-14 h-14" />
+                        <p className="text-xs font-semibold text-slate-500">ไม่มีข้อมูลสินค้าในระบบ</p>
                       </div>
                     </td>
                   </tr>
@@ -724,10 +724,10 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                   });
 
                   const groupColors = [
-                    { bg: 'bg-amber-50/90 text-amber-950 border-amber-300', tag: 'bg-amber-300 text-amber-950 border-amber-400' },
-                    { bg: 'bg-sky-50/90 text-sky-950 border-sky-300', tag: 'bg-sky-300 text-sky-950 border-sky-400' },
-                    { bg: 'bg-emerald-50/90 text-emerald-950 border-emerald-300', tag: 'bg-emerald-300 text-emerald-950 border-emerald-400' },
-                    { bg: 'bg-indigo-50/90 text-indigo-950 border-indigo-300', tag: 'bg-indigo-300 text-indigo-950 border-indigo-400' },
+                    { bg: 'bg-white/80 text-slate-800', tag: 'bg-amber-500/15 text-amber-800 border-amber-500/30' },
+                    { bg: 'bg-white/80 text-slate-800', tag: 'bg-blue-500/15 text-blue-800 border-blue-500/30' },
+                    { bg: 'bg-white/80 text-slate-800', tag: 'bg-emerald-500/15 text-emerald-800 border-emerald-500/30' },
+                    { bg: 'bg-white/80 text-slate-800', tag: 'bg-indigo-500/15 text-indigo-800 border-indigo-500/30' },
                   ];
 
                   return groups.map((groupName, groupIdx) => {
@@ -737,15 +737,15 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                     return (
                       <React.Fragment key={groupName}>
                         {/* Group Header Row */}
-                        <tr className={cn("border-y-2 border-slate-900/10 font-bold", colorScheme.bg)}>
+                        <tr className="bg-slate-50/80 backdrop-blur-sm border-y border-slate-200/50">
                           <td colSpan={9} className="px-4 py-2.5 align-middle select-none">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className={cn("px-2.5 py-1 text-[11px] font-black uppercase tracking-widest border-2 border-slate-900", colorScheme.tag)}>
-                                  📂 {groupName === 'UNASSIGNED' ? 'ไม่มีรหัสไฟล์ / UNASSIGNED' : `ไฟล์: ${groupName}`}
+                              <div className="flex items-center gap-2.5">
+                                <span className={cn("px-3 py-1 text-xs font-bold rounded-full border shadow-sm", colorScheme.tag)}>
+                                  📂 {groupName === 'UNASSIGNED' ? 'ไม่มีรหัสไฟล์' : `ไฟล์: ${groupName}`}
                                 </span>
-                                <span className="text-[10px] text-slate-700 font-extrabold bg-white/60 px-2 py-0.5 border border-slate-400/30">
-                                  สินค้าในไฟล์นี้ {groupItems.length} รายการ
+                                <span className="text-[11px] text-slate-500 font-medium">
+                                  {groupItems.length} รายการ
                                 </span>
                               </div>
                             </div>
@@ -759,8 +759,8 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                             <tr 
                               key={item.serialNo} 
                               className={cn(
-                                "hover:bg-slate-100 cursor-pointer border-b border-slate-200 transition-colors group",
-                                isChecked ? "bg-blue-50/30" : ""
+                                "hover:bg-blue-50/40 cursor-pointer border-b border-slate-100 transition-colors group",
+                                isChecked ? "bg-blue-50/50" : ""
                               )}
                               onClick={() => handleSelectItem(item)}
                             >
@@ -779,22 +779,22 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                               </td>
 
                               {/* IBASE */}
-                              <td className="px-4 py-3 text-[11px] font-mono font-black tracking-tight text-slate-755 select-all">
+                              <td className="px-4 py-3 text-[11px] font-mono font-medium text-slate-600 select-all">
                                 {item.ibase || '-'}
                               </td>
 
                               {/* Line Item */}
-                              <td className="px-4 py-3 text-center text-xs font-mono font-bold text-slate-500">
+                              <td className="px-4 py-3 text-center text-xs font-mono font-medium text-slate-400">
                                 {item.lineItem || '-'}
                               </td>
 
                               {/* Part No */}
-                              <td className="px-4 py-3 text-xs font-mono font-black tracking-tighter text-slate-800 break-all select-all">
+                              <td className="px-4 py-3 text-xs font-mono font-bold tracking-tight text-slate-800 break-all select-all">
                                 {item.partNo || 'N/A'}
                               </td>
 
                               {/* Serial No */}
-                              <td className="px-4 py-3 text-xs font-sans font-black tracking-tighter text-blue-600 break-all select-all">
+                              <td className="px-4 py-3 text-xs font-sans font-bold tracking-tight text-blue-600 break-all select-all">
                                 {getDisplaySerial(item.serialNo)}
                               </td>
 
@@ -886,8 +886,8 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                     <div 
                       key={item.serialNo}
                       className={cn(
-                        "bg-white border-2 border-slate-900 p-3.5 sm:p-4 neo-brutalism-shadow hover:translate-y-[-2px] hover:translate-x-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] transition-all flex flex-col justify-between group relative min-h-[185px] cursor-pointer",
-                        isChecked ? "border-blue-600 bg-blue-50/15 shadow-[3px_3px_0px_0px_rgba(37,99,235,1)]" : ""
+                        "bg-white/70 backdrop-blur-xl border border-white/80 p-4 rounded-2xl shadow-sm hover:shadow-lg hover:border-blue-400/50 hover:bg-white/90 transition-all flex flex-col justify-between group relative min-h-[185px] cursor-pointer",
+                        isChecked ? "border-blue-500 bg-blue-50/40 ring-2 ring-blue-500/20 shadow-md" : ""
                       )}
                       onClick={() => handleSelectItem(item)}
                     >
@@ -906,8 +906,8 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                                 <Square className="w-4 h-4 text-slate-300 hover:text-slate-400" />
                               )}
                             </button>
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 border-2 font-black text-[8px] uppercase tracking-tighter ${
-                              item.status === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-600'
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[9px] uppercase tracking-tight ${
+                              item.status === 'IN' ? 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-700' : 'border border-rose-500/20 bg-rose-500/10 text-rose-700'
                             }`}>
                               {item.status === 'IN' ? <ArrowDownLeft className="w-2.5 h-2.5" /> : <ArrowUpRight className="w-2.5 h-2.5" />}
                               {item.status}
@@ -915,30 +915,30 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                           </div>
                           
                           <div className="flex items-center gap-1 max-w-[60%] justify-end">
-                            <MapPin className="w-2.5 h-2.5 text-blue-600 shrink-0" />
-                            <span className="text-[8.5px] uppercase font-black tracking-wider truncate text-slate-700" title={item.currentLocation}>
+                            <MapPin className="w-3 h-3 text-blue-600 shrink-0" />
+                            <span className="text-[10px] uppercase font-bold tracking-tight truncate text-slate-600" title={item.currentLocation}>
                               {item.currentLocation || 'In-Base'}
                             </span>
                           </div>
                         </div>
 
                         {/* Invoice & Department Tags */}
-                        <div className="flex flex-wrap items-center gap-1 mb-2">
+                        <div className="flex flex-wrap items-center gap-1.5 mb-2">
                           {item.invoiceNo && (
-                            <span className="text-[7.5px] font-mono font-bold bg-slate-100 text-slate-800 px-1.5 py-0.5 border border-slate-300 truncate max-w-[130px]" title={item.invoiceNo}>
+                            <span className="text-[9px] font-mono font-semibold bg-slate-100/80 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200/60 truncate max-w-[130px]" title={item.invoiceNo}>
                               📁 #{item.invoiceNo}
                             </span>
                           )}
                           {item.segment && (
-                            <span className="text-[7.5px] font-mono font-bold bg-blue-50 text-blue-800 px-1.5 py-0.5 border border-blue-200 truncate max-w-[110px]" title={item.segment}>
+                            <span className="text-[9px] font-mono font-semibold bg-blue-500/10 text-blue-800 px-2 py-0.5 rounded-md border border-blue-500/20 truncate max-w-[110px]" title={item.segment}>
                               🏢 {item.segment}
                             </span>
                           )}
                         </div>
 
                         {/* Serial Number with Quick Copy button */}
-                        <div className="flex items-center justify-between gap-1 bg-slate-50 border-2 border-slate-900/15 px-2 py-1 mb-2">
-                          <p className="text-[11px] font-black font-mono tracking-tight text-slate-900 break-all leading-tight">
+                        <div className="flex items-center justify-between gap-1 bg-white/80 backdrop-blur-md border border-white/90 shadow-sm rounded-xl px-2.5 py-1.5 mb-2">
+                          <p className="text-xs font-bold font-mono tracking-tight text-slate-900 break-all leading-tight">
                             {getDisplaySerial(item.serialNo)}
                           </p>
                           <button
@@ -949,7 +949,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                               setCopyNotification(`คัดลอก S/N: ${getDisplaySerial(item.serialNo)} เรียบร้อย`);
                               setTimeout(() => setCopyNotification(null), 2500);
                             }}
-                            className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-900 rounded cursor-pointer shrink-0"
+                            className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-800 rounded-lg cursor-pointer shrink-0 transition-colors"
                             title="คัดลอก Serial Number"
                           >
                             <Copy className="w-3 h-3" />
@@ -959,20 +959,20 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                         {/* Description and Part */}
                         <div className="space-y-0.5 mb-2">
                           <div className="flex items-center justify-between gap-1">
-                            <p className="text-[8.5px] uppercase font-black tracking-tight text-blue-700 font-mono">
+                            <p className="text-[10px] uppercase font-bold tracking-tight text-blue-600 font-mono">
                               {item.partNo || 'NO PART REF'}
                             </p>
                             {item.customsStatus && (
-                              <span className="text-[7px] font-bold text-purple-700 bg-purple-50 px-1 border border-purple-200">
+                              <span className="text-[8px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
                                 {item.customsStatus}
                               </span>
                             )}
                           </div>
-                          <p className="text-[10px] font-bold tracking-tight uppercase line-clamp-2 leading-tight text-slate-800" title={item.description}>
+                          <p className="text-xs font-semibold tracking-tight line-clamp-2 leading-snug text-slate-800" title={item.description}>
                             {item.description}
                           </p>
                           {item.meaningInThai && (
-                            <p className="text-[8.5px] font-semibold text-slate-500 line-clamp-1 italic">
+                            <p className="text-[10px] text-slate-500 line-clamp-1 italic">
                               ({item.meaningInThai})
                             </p>
                           )}
@@ -980,13 +980,13 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
 
                         {/* QTY & Action Button */}
                         <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
-                          <span className="text-[10px] font-mono font-black text-slate-950 bg-amber-200 px-2 py-0.5 border-2 border-slate-900 shadow-[1px_1px_0px_0px_rgba(15,23,42,1)]">
+                          <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">
                             QTY: {item.qty !== undefined ? item.qty : 1} {item.uom || 'EA'}
                           </span>
                           <button
                             type="button"
                             onClick={(e) => handleOpenInOutModal(item, e)}
-                            className="px-2.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 border-2 border-slate-900 font-sans text-[9px] font-black uppercase tracking-tight flex items-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                            className="px-3 py-1.5 bg-gradient-to-tr from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-sans text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 transition-all"
                             title="ตัดสต็อกเบิกออก / คืนเข้าคลัง"
                           >
                             <RefreshCw className="w-3 h-3 text-slate-950" />
@@ -996,27 +996,27 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                       </div>
 
                       {/* Footer entry and timing */}
-                      <div className="mt-3 pt-2 border-t-2 border-slate-100 flex flex-col gap-1">
+                      <div className="mt-3 pt-2 border-t border-slate-100 flex flex-col gap-1">
                         {item.importEntryNo ? (
-                          <div className="flex items-center justify-between text-[8px] gap-2">
-                            <span className="font-black text-blue-600 truncate italic">
+                          <div className="flex items-center justify-between text-[9px] gap-2">
+                            <span className="font-semibold text-blue-600 truncate italic">
                               IE: {item.importEntryNo}
                             </span>
-                            <span className="font-bold uppercase opacity-45 shrink-0">
+                            <span className="text-slate-400 font-medium shrink-0">
                               Line: {item.importEntryLineNo || '-'}
                             </span>
                           </div>
                         ) : (
-                          <div className="text-[8px] opacity-25 uppercase font-mono italic">
+                          <div className="text-[9px] text-slate-400 italic">
                             No Import Entry
                           </div>
                         )}
                         
-                        <div className="text-[8.5px] font-mono font-bold text-slate-400 text-right flex items-center justify-between gap-1 leading-none mt-0.5">
-                          <span className="text-blue-600 font-sans font-black uppercase text-[8px] tracking-wider shrink-0 flex items-center gap-0.5">
-                            ดูสเปค ➔
+                        <div className="text-[9px] font-mono text-slate-400 text-right flex items-center justify-between gap-1 leading-none mt-0.5">
+                          <span className="text-blue-600 font-sans font-bold text-[9px] tracking-wide shrink-0 flex items-center gap-0.5">
+                            ดูรายละเอียด ➔
                           </span>
-                          <span className="text-right text-[8px]">
+                          <span className="text-right text-[9px]">
                             {item.lastUpdate?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} @ {item.lastUpdate?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
                           </span>
                         </div>
@@ -1106,7 +1106,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
           <motion.div 
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white border-2 sm:border-4 border-slate-900 w-full max-w-5xl neo-brutalism-shadow relative my-auto sm:my-8 flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden rounded-none shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] sm:shadow-[6px_6px_0px_0px_rgba(15,23,42,1)]"
+            className="bg-white/90 backdrop-blur-3xl border border-white/80 w-full max-w-5xl rounded-3xl shadow-2xl relative my-auto sm:my-8 flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
@@ -1116,29 +1116,29 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                 setTempItem(null);
                 setIsLocationExpanded(false);
               }}
-              className="absolute top-3 right-3 sm:top-4 sm:right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1 sm:p-1.5 transition-colors neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 z-10 cursor-pointer"
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/80 hover:bg-white text-slate-600 hover:text-slate-900 border border-white/80 shadow-sm flex items-center justify-center transition-colors z-10 cursor-pointer"
               aria-label="Close dialog"
             >
-              <X className="w-4 h-4 sm:w-5 sm:h-5" />
+              <X className="w-4 h-4" />
             </button>
 
             {/* Modal Heading Header */}
-            <div className="bg-slate-900 text-white p-4 sm:p-6 pr-12 sm:pr-16 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+            <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-5 sm:p-6 pr-14 sm:pr-16 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 border-b border-white/10">
               <div>
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <span className="text-[8.5px] sm:text-[9px] uppercase font-black bg-blue-600 text-white px-2 py-0.5 border border-blue-400 font-mono tracking-widest">
-                    แผงควบคุมหลักฝ่ายแอดมิน (CIPL PROFILE WORKSPACE)
+                <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                  <span className="text-[10px] uppercase font-bold bg-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-400/30 font-mono tracking-wide">
+                    CIPL Profile Workspace
                   </span>
-                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 border border-white font-black text-[8.5px] sm:text-[9px] uppercase ${
-                    tempItem.status === 'IN' ? 'bg-emerald-600' : 'bg-red-600'
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase ${
+                    tempItem.status === 'IN' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' : 'bg-rose-500/20 text-rose-300 border border-rose-400/30'
                   }`}>
                     {tempItem.status}
                   </span>
-                  <span className="bg-amber-300 text-amber-950 text-[8.5px] sm:text-[9px] font-mono font-black px-2 py-0.5 border border-amber-400">
+                  <span className="bg-amber-400/20 text-amber-300 text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border border-amber-400/30">
                     คงเหลือ: {tempItem.qty !== undefined ? tempItem.qty : 1} {tempItem.uom || 'EA'}
                   </span>
                 </div>
-                <h3 className="text-lg md:text-2xl font-black font-mono tracking-tighter uppercase break-all">
+                <h3 className="text-xl md:text-2xl font-bold font-mono tracking-tight uppercase break-all">
                   {getDisplaySerial(tempItem.serialNo)}
                 </h3>
               </div>
@@ -1146,21 +1146,21 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
               <button
                 type="button"
                 onClick={(e) => handleOpenInOutModal(tempItem, e)}
-                className="px-3 py-1.5 sm:px-4 sm:py-2 bg-amber-400 hover:bg-amber-500 text-slate-950 border-2 border-slate-900 font-sans text-[9.5px] sm:text-[10.5px] font-black uppercase tracking-wider flex items-center gap-2 shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] cursor-pointer active:translate-x-0.5 active:translate-y-0.5 shrink-0 self-start md:self-auto"
+                className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-sans text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm cursor-pointer active:scale-95 transition-all shrink-0 self-start md:self-auto"
               >
-                <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-950" />
+                <RefreshCw className="w-3.5 h-3.5 text-slate-950" />
                 <span>ตัดสต็อก / เบิกออก-คืนเข้า (IN-OUT)</span>
               </button>
             </div>
 
-            {/* Navigation Tab Heads */}
-            <div className="flex border-b-2 sm:border-b-4 border-slate-900 bg-slate-100 font-black text-[9.5px] sm:text-[10px] uppercase tracking-wider shrink-0 select-none overflow-x-auto scrollbar-none">
+            {/* Navigation Tab Heads (iOS Segmented Tabs) */}
+            <div className="flex border-b border-slate-200/60 bg-white/60 backdrop-blur-md px-4 pt-2 font-semibold text-xs tracking-tight shrink-0 select-none overflow-x-auto scrollbar-none gap-2">
               <button
                 type="button"
                 onClick={() => setModalTab('profile')}
                 className={cn(
-                  "px-4 sm:px-6 py-3 sm:py-4 border-r-2 border-slate-900 transition-colors uppercase cursor-pointer whitespace-nowrap",
-                  modalTab === 'profile' ? "bg-white text-slate-900 border-b-[4px] border-b-blue-600" : "text-slate-500 hover:bg-slate-50"
+                  "px-4 py-2.5 rounded-t-xl transition-all cursor-pointer whitespace-nowrap",
+                  modalTab === 'profile' ? "bg-white text-blue-600 font-bold border-b-2 border-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
                 )}
               >
                 📝 รายละเอียดฝ่ายแอดมิน & การศุลกากร
@@ -1567,7 +1567,7 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
           <motion.div 
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white border-2 sm:border-4 border-slate-900 w-full max-w-4xl neo-brutalism-shadow relative my-auto sm:my-8 flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden rounded-none shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] sm:shadow-[6px_6px_0px_0px_rgba(15,23,42,1)]"
+            className="bg-white/90 backdrop-blur-3xl border border-white/80 w-full max-w-4xl rounded-3xl shadow-2xl relative my-auto sm:my-8 flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
@@ -1577,19 +1577,19 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
                   setIsManualAddOpen(false);
                 }
               }}
-              className="absolute top-3 right-3 sm:top-4 sm:right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1 sm:p-1.5 transition-colors neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 z-10 cursor-pointer"
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/80 hover:bg-white text-slate-600 hover:text-slate-900 border border-white/80 shadow-sm flex items-center justify-center transition-colors z-10 cursor-pointer"
               aria-label="Close dialog"
               disabled={isManualSaving}
             >
-              <X className="w-4 h-4 sm:w-5 sm:h-5" />
+              <X className="w-4 h-4" />
             </button>
 
             {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-4 sm:p-6 pr-12 sm:pr-16 shrink-0">
-              <span className="text-[8.5px] sm:text-[9px] uppercase font-black bg-blue-600 text-white px-2 py-0.5 border border-blue-400 font-mono tracking-widest">
-                เพิ่มข้อมูลสินค้าแมนนวล (MANUAL ITEM CREATION WORKSPACE)
+            <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-5 sm:p-6 pr-14 sm:pr-16 shrink-0 border-b border-white/10">
+              <span className="text-[10px] uppercase font-bold bg-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-400/30 font-mono tracking-wide">
+                Manual Item Creation
               </span>
-              <h3 className="text-lg md:text-2xl font-black font-sans tracking-tight uppercase mt-1">
+              <h3 className="text-xl md:text-2xl font-bold font-sans tracking-tight uppercase mt-1">
                 สร้างรายการสินค้าใหม่ด้วยตนเอง
               </h3>
             </div>
@@ -2071,49 +2071,49 @@ export function InventoryList({ initialSegment, onClearInitialSegment }: Invento
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white border-2 sm:border-4 border-slate-900 w-full max-w-lg neo-brutalism-shadow relative my-auto sm:my-8 flex flex-col overflow-hidden rounded-none shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] sm:shadow-[8px_8px_0px_0px_rgba(15,23,42,1)]"
+            className="bg-white/90 backdrop-blur-3xl border border-white/80 w-full max-w-lg rounded-3xl shadow-2xl relative my-auto sm:my-8 flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Close Button */}
             <button 
               onClick={() => { if (!isInOutProcessing) setInOutItem(null); }}
-              className="absolute top-3 right-3 sm:top-4 sm:right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1 sm:p-1.5 transition-colors z-10 cursor-pointer shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5"
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/80 hover:bg-white text-slate-600 hover:text-slate-900 border border-white/80 shadow-sm flex items-center justify-center transition-colors z-10 cursor-pointer"
               disabled={isInOutProcessing}
             >
-              <X className="w-4 h-4 sm:w-5 sm:h-5" />
+              <X className="w-4 h-4" />
             </button>
 
             {/* Header */}
-            <div className="bg-slate-900 text-white p-4 sm:p-5 pr-12 sm:pr-14">
-              <span className="text-[8px] sm:text-[8.5px] font-black uppercase bg-amber-400 text-slate-950 px-2 py-0.5 border border-amber-300 font-mono tracking-widest">
-                ระบบจัดการตัดสต็อกเบิกสินค้า (IN / OUT STOCK CUTTING WORKSPACE)
+            <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-5 pr-14 border-b border-white/10">
+              <span className="text-[10px] uppercase font-bold bg-amber-400/20 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-400/30 font-mono tracking-wide">
+                Stock Movement Workspace
               </span>
-              <h3 className="text-base sm:text-xl font-black font-sans tracking-tight uppercase mt-1 flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+              <h3 className="text-lg font-bold font-sans tracking-tight uppercase mt-1.5 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-amber-400" />
                 <span>ทำรายการเบิกออก / คืนเข้าสต็อก</span>
               </h3>
             </div>
 
             {/* Item Summary Box */}
-            <div className="p-3.5 sm:p-5 bg-slate-50 border-b-2 border-slate-900 space-y-2">
+            <div className="p-4 sm:p-5 bg-white/60 backdrop-blur-md border-b border-slate-200/60 space-y-2.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-mono font-black text-blue-600 bg-blue-50 px-2 py-0.5 border border-blue-200">
+                <span className="text-xs font-mono font-bold text-blue-600 bg-blue-500/10 px-2.5 py-1 rounded-full border border-blue-500/20">
                   S/N: {getDisplaySerial(inOutItem.serialNo)}
                 </span>
                 <span className={cn(
-                  "text-[9px] font-black uppercase px-2 py-0.5 border-2",
-                  inOutItem.status === 'IN' ? "bg-emerald-100 text-emerald-800 border-emerald-600" : "bg-red-100 text-red-800 border-red-600"
+                  "text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border",
+                  inOutItem.status === 'IN' ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" : "bg-rose-500/10 text-rose-700 border-rose-500/20"
                 )}>
-                  สถานะปัจจุบัน: {inOutItem.status} ({inOutItem.currentLocation || 'In-Base'})
+                  สถานะ: {inOutItem.status} ({inOutItem.currentLocation || 'In-Base'})
                 </span>
               </div>
-              <p className="text-xs font-black text-slate-900 uppercase font-sans line-clamp-2">
+              <p className="text-xs font-semibold text-slate-800 uppercase font-sans line-clamp-2">
                 {inOutItem.description}
               </p>
-              <div className="flex justify-between items-center text-[10px] font-mono font-bold text-slate-600 pt-2 border-t border-slate-200">
-                <span>PART REF: {inOutItem.partNo || 'N/A'}</span>
-                <span className="text-slate-950 font-black text-xs bg-amber-200 px-2 py-0.5 border border-amber-400">
-                  จำนวนที่มีในระบบ: {inOutItem.qty !== undefined ? inOutItem.qty : 1} {inOutItem.uom || 'EA'}
+              <div className="flex justify-between items-center text-[11px] font-mono text-slate-500 pt-2 border-t border-slate-200/60">
+                <span>PART: {inOutItem.partNo || 'N/A'}</span>
+                <span className="text-blue-700 font-bold bg-blue-500/10 px-2.5 py-0.5 rounded-full border border-blue-500/20">
+                  คงเหลือ: {inOutItem.qty !== undefined ? inOutItem.qty : 1} {inOutItem.uom || 'EA'}
                 </span>
               </div>
             </div>
@@ -2357,20 +2357,28 @@ export function TransactionHistory() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-3">
-          <History className="w-4 h-4 opacity-70" />
-          <span>บันทึกประวัติการเดินระบบ</span>
-        </h3>
+        <div>
+          <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-800 flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center border border-blue-200/50 shadow-xs">
+              <History className="w-4 h-4" />
+            </div>
+            <span>บันทึกประวัติการเดินระบบ</span>
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5 ml-10.5">ตรวจสอบบันทึกการนำเข้า-ส่งออกสินค้าและเส้นทางการขนส่ง</p>
+        </div>
         
-        <div className="flex items-center gap-2 border-2 border-slate-900 bg-white p-1 neo-brutalism-shadow">
+        {/* iOS Segmented Switcher */}
+        <div className="flex items-center gap-1 bg-white/60 backdrop-blur-xl border border-white/80 p-1 rounded-2xl shadow-xs self-start sm:self-auto">
           <button 
             type="button"
             onClick={() => setViewMode('grid')}
             className={cn(
-              "px-3 py-1.5 text-[9px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer",
-              viewMode === 'grid' ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100"
+              "px-3.5 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer",
+              viewMode === 'grid' 
+                ? "bg-white text-slate-900 shadow-xs font-bold border border-black/5" 
+                : "text-slate-500 hover:text-slate-900 hover:bg-white/40"
             )}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
@@ -2380,8 +2388,10 @@ export function TransactionHistory() {
             type="button"
             onClick={() => setViewMode('list')}
             className={cn(
-              "px-3 py-1.5 text-[9px] uppercase font-black tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer",
-              viewMode === 'list' ? "bg-slate-900 text-white" : "text-slate-900 hover:bg-slate-100"
+              "px-3.5 py-1.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer",
+              viewMode === 'list' 
+                ? "bg-white text-slate-900 shadow-xs font-bold border border-black/5" 
+                : "text-slate-500 hover:text-slate-900 hover:bg-white/40"
             )}
           >
             <List className="w-3.5 h-3.5" />
@@ -2390,24 +2400,24 @@ export function TransactionHistory() {
         </div>
       </div>
 
-      {/* Date Filter Bar */}
-      <div className="bg-white border-2 border-slate-900 p-4 neo-brutalism-shadow flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center flex-1">
+      {/* Date Filter Bar (iOS Liquid Glass) */}
+      <div className="liquid-glass-card p-4 sm:p-5 rounded-3xl border border-white/80 shadow-sm flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="flex flex-col md:flex-row gap-3 sm:gap-4 items-stretch md:items-center flex-1">
           <div className="flex flex-col gap-1.5 flex-1 max-w-sm">
-            <span className="text-[9px] uppercase font-black tracking-[0.15em] text-slate-500 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-slate-900 rounded-full"></span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-slate-700 rounded-full"></span>
               เริ่มต้น (Start Date)
             </span>
             <input 
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="px-3 py-2 bg-white border-2 border-slate-900 font-mono text-xs font-black uppercase focus:outline-none focus:border-blue-600 transition-colors w-full h-[38px]"
+              className="glass-input px-3.5 py-2 text-xs font-medium rounded-xl transition-colors w-full h-[40px] text-slate-700"
             />
           </div>
 
           <div className="flex flex-col gap-1.5 flex-1 max-w-sm">
-            <span className="text-[9px] uppercase font-black tracking-[0.15em] text-slate-500 flex items-center gap-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
               สิ้นสุด (End Date)
             </span>
@@ -2415,7 +2425,7 @@ export function TransactionHistory() {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="px-3 py-2 bg-white border-2 border-slate-900 font-mono text-xs font-black uppercase focus:outline-none focus:border-blue-600 transition-colors w-full h-[38px]"
+              className="glass-input px-3.5 py-2 text-xs font-medium rounded-xl transition-colors w-full h-[40px] text-slate-700"
             />
           </div>
 
@@ -2425,7 +2435,7 @@ export function TransactionHistory() {
                 setStartDate('');
                 setEndDate('');
               }}
-              className="px-4 py-2 self-start md:self-auto bg-red-50 hover:bg-red-100 text-red-600 border-2 border-red-650 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer flex items-center gap-1.5 h-[38px] md:mt-[18px] neo-brutalism-shadow-sm active:translate-x-0.5 active:translate-y-0.5"
+              className="px-4 py-2 self-start md:self-auto bg-rose-50/80 hover:bg-rose-100 text-rose-600 border border-rose-200/60 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 h-[40px] md:mt-[22px] shadow-xs"
             >
               <X className="w-3.5 h-3.5" />
               <span>ล้างการกรอง</span>
@@ -2434,165 +2444,172 @@ export function TransactionHistory() {
         </div>
 
         <div className="text-left md:text-right shrink-0">
-          <span className="text-[8px] uppercase font-black text-slate-400 block tracking-[0.2em] mb-0.5">Matched Records</span>
-          <span className="text-base font-black font-mono text-slate-800 bg-slate-50 px-2 py-1 border border-slate-200">
+          <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider mb-1">Matched Records</span>
+          <span className="inline-flex items-center text-xs font-bold font-mono text-slate-700 bg-white/70 border border-white/90 px-3 py-1.5 rounded-xl shadow-2xs">
             {filteredLogs.length} / {logs.length}
           </span>
         </div>
       </div>
 
       {viewMode === 'list' ? (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {filteredLogs.length === 0 ? (
-            <div className="p-16 text-center border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center gap-2 justify-center opacity-40">
-              <History className="w-12 h-12 text-slate-600" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-800">ไม่พบประวัติในช่วงวันที่ระบุ</p>
+            <div className="p-16 text-center border-2 border-dashed border-white/60 bg-white/30 backdrop-blur-md rounded-3xl flex flex-col items-center gap-2 justify-center">
+              <History className="w-10 h-10 text-slate-400 opacity-60" />
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-600">ไม่พบประวัติในช่วงวันที่ระบุ</p>
             </div>
           ) : (
             filteredLogs.map((log, idx) => (
               <motion.div 
-                initial={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0, x: -16 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: Math.min(idx * 0.05, 0.4) }}
+                transition={{ delay: Math.min(idx * 0.04, 0.3) }}
                 key={`${log.serialNo}-${idx}`}
-                className="bg-white border-2 border-slate-900 p-4 sm:p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-4 md:gap-8 lg:gap-12 neo-brutalism-shadow active-neo-brutalism relative overflow-hidden group"
+                className="liquid-glass-card p-4 sm:p-5 md:p-6 rounded-3xl border border-white/80 hover:bg-white/80 hover:shadow-lg transition-all flex flex-col md:flex-row md:items-center gap-4 md:gap-8 lg:gap-10 relative overflow-hidden group"
               >
-                <div className={`w-1.5 md:w-2 h-full absolute left-0 top-0 ${log.transactionType === 'IN' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                <div className={`w-1.5 h-full absolute left-0 top-0 ${log.transactionType === 'IN' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                 
                 <div className="flex items-center justify-between md:flex-col md:items-center gap-1 md:w-24 shrink-0">
                   <div className="flex flex-col md:items-center">
-                    <span className="text-[11px] font-mono font-black italic">
+                    <span className="text-xs font-mono font-bold text-slate-800">
                       {log.date?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
                     </span>
-                    <span className="text-[9px] uppercase font-black opacity-45 mt-0.5">
+                    <span className="text-[10px] font-medium text-slate-400 mt-0.5">
                       {log.date?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
 
                   {/* Badge on mobile */}
                   <div className={cn(
-                    "md:hidden px-2 py-1 border-2 border-slate-900 flex items-center gap-1 font-black text-[9px] uppercase",
-                    log.transactionType === 'IN' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                    "md:hidden px-2.5 py-1 rounded-full border flex items-center gap-1 font-bold text-[10px]",
+                    log.transactionType === 'IN' 
+                      ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' 
+                      : 'bg-rose-500/10 text-rose-700 border-rose-500/20'
                   )}>
                     {log.transactionType === 'IN' ? <ArrowDownLeft className="w-3.5 h-3.5" /> : <ArrowUpRight className="w-3.5 h-3.5" />}
                     <span>{log.transactionType}</span>
                   </div>
                 </div>
 
-                <div className="w-full md:w-56 shrink-0">
-                  <p className="text-[8.5px] uppercase font-black text-slate-400 mb-1 tracking-widest">Invoice Ref</p>
-                  <p className="text-xs font-black font-mono break-all">#{log.invoiceNo}</p>
+                <div className="w-full md:w-52 shrink-0">
+                  <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5 tracking-wider">Invoice Ref</p>
+                  <p className="text-xs font-mono font-bold text-slate-800 break-all">#{log.invoiceNo}</p>
                 </div>
 
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 w-full">
-                  <div className="border-t sm:border-t-0 md:border-l-2 border-slate-100 pt-2 sm:pt-0 md:pl-6">
-                    <p className="text-[8.5px] uppercase font-black text-slate-400 mb-1 tracking-widest">Asset ID</p>
-                    <p className="text-xs font-black font-mono tracking-tighter break-all">{log.serialNo}</p>
+                  <div className="border-t sm:border-t-0 md:border-l border-white/60 pt-2 sm:pt-0 md:pl-5">
+                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5 tracking-wider">Asset ID</p>
+                    <p className="text-xs font-bold font-mono text-blue-600 break-all">{log.serialNo}</p>
                   </div>
-                  <div className="sm:col-span-2 border-t sm:border-t-0 md:border-l-2 border-slate-100 pt-2 sm:pt-0 md:pl-6">
-                    <p className="text-[8.5px] uppercase font-black text-slate-400 mb-1 tracking-widest">Geographic Routing</p>
-                    <div className="flex items-center gap-2 sm:gap-4">
-                      <span className="text-[10px] uppercase font-black truncate max-w-[120px]">{log.origin}</span>
-                      <div className="flex items-center gap-1 opacity-40 shrink-0">
-                        <div className="w-1 h-1 bg-slate-900" />
-                        <div className="w-6 sm:w-12 h-[2px] bg-slate-900" />
+                  <div className="sm:col-span-2 border-t sm:border-t-0 md:border-l border-white/60 pt-2 sm:pt-0 md:pl-5">
+                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5 tracking-wider">Geographic Routing</p>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <span className="text-xs font-semibold text-slate-700 truncate max-w-[120px]">{log.origin}</span>
+                      <div className="flex items-center gap-1 text-slate-400 shrink-0">
+                        <div className="w-1 h-1 bg-slate-400 rounded-full" />
+                        <div className="w-6 sm:w-10 h-[1.5px] bg-slate-300" />
                         <ArrowUpRight className="w-3.5 h-3.5" />
                       </div>
-                      <span className="text-[10px] uppercase font-black truncate max-w-[120px] text-blue-600">{log.destination}</span>
+                      <span className="text-xs font-bold text-blue-600 truncate max-w-[120px]">{log.destination}</span>
                     </div>
                   </div>
-                  <div className="border-t sm:border-t-0 md:border-l-2 border-slate-100 pt-2 sm:pt-0 md:pl-6">
-                    <p className="text-[8.5px] uppercase font-black text-slate-400 mb-1 tracking-widest">Import Entry</p>
-                    <p className="text-[11px] font-black italic text-blue-600 truncate">{log.importEntryNo || 'N/A'}</p>
-                    <p className="text-[8.5px] font-bold uppercase opacity-30 tracking-widest">Line {log.importEntryLineNo || '-'}</p>
+                  <div className="border-t sm:border-t-0 md:border-l border-white/60 pt-2 sm:pt-0 md:pl-5">
+                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5 tracking-wider">Import Entry</p>
+                    <p className="text-xs font-bold text-slate-800 truncate">{log.importEntryNo || 'N/A'}</p>
+                    <p className="text-[10px] text-slate-400">Line {log.importEntryLineNo || '-'}</p>
                   </div>
                 </div>
 
                 <div className={cn(
-                  "hidden md:flex shrink-0 w-20 h-20 border-2 border-slate-900 flex-col items-center justify-center gap-1",
-                  log.transactionType === 'IN' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                  "hidden md:flex shrink-0 w-16 h-16 rounded-2xl border flex-col items-center justify-center gap-0.5 shadow-2xs",
+                  log.transactionType === 'IN' 
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' 
+                    : 'bg-rose-500/10 border-rose-500/20 text-rose-600'
                 )}>
-                  {log.transactionType === 'IN' ? <ArrowDownLeft className="w-6 h-6" /> : <ArrowUpRight className="w-6 h-6" />}
-                  <span className="text-[10px] font-black uppercase tracking-tighter">{log.transactionType}</span>
+                  {log.transactionType === 'IN' ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
+                  <span className="text-[10px] font-bold">{log.transactionType}</span>
                 </div>
               </motion.div>
             ))
           )}
         </div>
       ) : (
-        /* Small boxes Grid View for logs */
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        /* Small boxes Grid View for logs (iOS Liquid Glass) */
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5 sm:gap-4">
           {filteredLogs.length === 0 ? (
-            <div className="col-span-full p-16 text-center border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center gap-2 justify-center opacity-40 w-full">
-              <History className="w-12 h-12 text-slate-600" />
-              <p className="text-xs font-black uppercase tracking-widest text-slate-800">ไม่พบประวัติในช่วงวันที่ระบุ</p>
+            <div className="col-span-full p-16 text-center border-2 border-dashed border-white/60 bg-white/30 backdrop-blur-md rounded-3xl flex flex-col items-center gap-2 justify-center w-full">
+              <History className="w-10 h-10 text-slate-400 opacity-60" />
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-600">ไม่พบประวัติในช่วงวันที่ระบุ</p>
             </div>
           ) : (
             filteredLogs.map((log, idx) => (
               <motion.div 
-                initial={{ opacity: 0, y: 15 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(idx * 0.03, 0.4) }}
+                transition={{ delay: Math.min(idx * 0.03, 0.3) }}
                 key={`${log.serialNo}-${idx}`}
-                className="bg-white border-2 border-slate-900 p-4 neo-brutalism-shadow hover:translate-y-[-2px] hover:translate-x-[-2px] hover:shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] transition-all flex flex-col justify-between group relative min-h-[175px] overflow-hidden"
+                className="liquid-glass-card p-4 rounded-3xl border border-white/80 hover:bg-white/85 hover:shadow-lg hover:-translate-y-0.5 transition-all flex flex-col justify-between group relative min-h-[175px] overflow-hidden"
               >
                 {/* Left accent bar */}
-                <div className={`w-1.5 h-full absolute left-0 top-0 ${log.transactionType === 'IN' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                <div className={`w-1 h-full absolute left-0 top-0 ${log.transactionType === 'IN' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                 
-                <div className="pl-1.5 flex-1 flex flex-col justify-between">
+                <div className="pl-1 flex-1 flex flex-col justify-between">
                   <div>
                     {/* Date & Badge */}
-                    <div className="flex items-center justify-between gap-1 mb-2">
-                      <div className="flex flex-col text-[8px] font-mono leading-none">
-                        <span className="font-black text-slate-800">
+                    <div className="flex items-center justify-between gap-1 mb-2.5">
+                      <div className="flex flex-col text-[10px] font-mono leading-tight">
+                        <span className="font-bold text-slate-800">
                           {log.date?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
                         </span>
-                        <span className="opacity-45 mt-0.5">
+                        <span className="text-slate-400">
                           {log.date?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
                         </span>
                       </div>
 
-                      <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 border-2 font-black text-[8px] uppercase tracking-tighter ${
-                        log.transactionType === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-650'
-                      }`}>
+                      <span className={cn(
+                        "inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-bold border",
+                        log.transactionType === 'IN' 
+                          ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' 
+                          : 'bg-rose-500/10 text-rose-700 border-rose-500/20'
+                      )}>
                         {log.transactionType}
                       </span>
                     </div>
 
                     {/* Invoice Ref */}
                     <div className="mb-2">
-                      <p className="text-[7.5px] uppercase font-black text-slate-400 tracking-widest leading-none">Invoice Ref</p>
-                      <p className="text-[10px] font-black font-mono break-all text-slate-700 leading-normal">#{log.invoiceNo}</p>
+                      <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Invoice Ref</p>
+                      <p className="text-xs font-mono font-bold text-slate-700 break-all leading-snug">#{log.invoiceNo}</p>
                     </div>
 
                     {/* Asset ID */}
                     <div className="mb-2">
-                      <p className="text-[7.5px] uppercase font-black text-slate-400 tracking-widest leading-none">Asset ID</p>
-                      <p className="text-[10px] font-black font-mono break-all text-blue-900 bg-blue-50/50 p-1 border border-blue-100 mt-0.5 leading-snug">
+                      <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Asset ID</p>
+                      <p className="text-[11px] font-mono font-bold text-blue-700 bg-blue-500/5 px-2 py-1 rounded-lg border border-blue-200/50 mt-0.5 break-all">
                         {log.serialNo}
                       </p>
                     </div>
 
                     {/* Routing Address */}
                     <div className="mb-2">
-                      <p className="text-[7.5px] uppercase font-black text-slate-400 tracking-widest leading-none mb-1">Route</p>
-                      <div className="flex items-center justify-between text-[8px] font-black gap-1">
+                      <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider mb-0.5">Route</p>
+                      <div className="flex items-center justify-between text-[11px] font-medium gap-1">
                         <span className="truncate max-w-[45%] text-slate-700" title={log.origin}>{log.origin}</span>
-                        <ArrowUpRight className="w-2.5 h-2.5 opacity-30 shrink-0" />
-                        <span className="truncate max-w-[45%] text-blue-600" title={log.destination}>{log.destination}</span>
+                        <ArrowUpRight className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate max-w-[45%] text-blue-600 font-semibold" title={log.destination}>{log.destination}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Import Entry & Line */}
-                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[8px]">
-                    <span className="font-bold text-slate-400 uppercase tracking-tight">Import Entry</span>
+                  <div className="mt-2 pt-2 border-t border-slate-100/80 flex items-center justify-between text-[10px]">
+                    <span className="font-semibold text-slate-400 uppercase tracking-tight">Import Entry</span>
                     {log.importEntryNo ? (
-                      <span className="font-black text-blue-600 truncate italic max-w-[70%]" title={log.importEntryNo}>
+                      <span className="font-bold text-blue-600 truncate max-w-[70%]" title={log.importEntryNo}>
                         {log.importEntryNo} (L:{log.importEntryLineNo || '-'})
                       </span>
                     ) : (
-                      <span className="opacity-30 italic">N/A</span>
+                      <span className="text-slate-400 italic">N/A</span>
                     )}
                   </div>
                 </div>
@@ -2719,52 +2736,52 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
   return (
     <div className="space-y-6 sm:space-y-8 animate-fade-in w-full max-w-full overflow-hidden">
       
-      {/* Upper sub-header toolbar exact image layout */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pb-2 border-b-2 border-slate-200">
+      {/* Upper sub-header toolbar (iOS Liquid Glass) */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pb-2 border-b border-slate-200/60">
         <div>
-          <span className="text-[9px] sm:text-[10px] font-black tracking-widest text-[#3b82f6] uppercase">SYNCHRONIZED LEDGER</span>
-          <h3 className="text-base sm:text-lg font-black font-sans text-slate-900 tracking-tight uppercase flex items-center gap-2">
-            <span className="w-1.5 h-4 bg-[#3b82f6] inline-block"></span>
+          <span className="text-[10px] font-bold tracking-widest text-blue-600 uppercase">SYNCHRONIZED LEDGER</span>
+          <h3 className="text-base sm:text-lg font-bold font-sans text-slate-900 tracking-tight flex items-center gap-2">
+            <span className="w-1.5 h-4 bg-blue-600 rounded-full inline-block"></span>
             Asset Management Workspace
           </h3>
         </div>
         
-        {/* Toggle Switch design matching image */}
-        <div className="flex items-center justify-between sm:justify-start gap-3 bg-white px-3 py-1.5 border-2 border-slate-900 rounded-none shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] self-start sm:self-auto">
-          <span className="text-[10.5px] sm:text-[11px] font-black uppercase text-slate-700 font-mono tracking-tight">แสดงเฉพาะของฉัน</span>
+        {/* iOS Glass Toggle Switch */}
+        <div className="flex items-center justify-between sm:justify-start gap-3 bg-white/70 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/80 shadow-sm self-start sm:self-auto">
+          <span className="text-xs font-semibold text-slate-700 tracking-tight">แสดงเฉพาะของฉัน</span>
           <button 
             type="button"
             onClick={() => setShowOnlyMine(!showOnlyMine)}
             className={cn(
-              "w-10 h-6 flex items-center p-0.5 transition-all duration-300 rounded-full border border-slate-900 select-none cursor-pointer",
+              "w-11 h-6 flex items-center p-0.5 transition-all duration-300 rounded-full select-none cursor-pointer",
               showOnlyMine ? "bg-blue-600 justify-end" : "bg-slate-200 justify-start"
             )}
           >
-            <span className="w-4.5 h-4.5 bg-white rounded-full shadow border border-slate-900"></span>
+            <span className="w-5 h-5 bg-white rounded-full shadow-md"></span>
           </button>
         </div>
       </div>
 
-      {/* 4 Metric cards in a responsive grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-6">
+      {/* 4 Metric cards in iOS Liquid Glass */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {stats.map((stat, idx) => (
           <div 
             key={idx} 
-            className="bg-white border-2 border-slate-900 flex flex-col justify-between p-3.5 sm:p-6 rounded-none shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] sm:shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] hover:translate-y-[-2px] hover:translate-x-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(11,22,44,1)] transition-all duration-200 group relative overflow-hidden min-h-28 sm:min-h-40"
+            className="liquid-glass-card flex flex-col justify-between p-4 sm:p-6 rounded-3xl group relative overflow-hidden min-h-28 sm:min-h-40 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_14px_36px_rgba(0,113,227,0.1)] transition-all duration-300"
           >
             <div>
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4">
-                <div className="p-1 sm:p-1.5 border border-slate-950 bg-slate-50 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-200 shrink-0">
-                  <stat.icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-900 group-hover:text-white" />
+              <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                <div className="p-1.5 sm:p-2 rounded-xl bg-blue-500/10 text-blue-600 border border-blue-500/20 group-hover:scale-110 transition-transform duration-200 shrink-0">
+                  <stat.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
                 </div>
-                <span className="text-[8px] sm:text-[9px] uppercase font-black tracking-wider text-slate-500 font-sans truncate">{stat.label}</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 font-sans truncate">{stat.label}</span>
               </div>
               <div className="z-10 relative">
-                <span className="text-2xl sm:text-4xl font-black font-mono tracking-tighter text-slate-900">{stat.value}</span>
+                <span className="text-2xl sm:text-4xl font-extrabold font-mono tracking-tight text-slate-900">{stat.value}</span>
               </div>
             </div>
             
-            {/* Smooth trendline graphics exactly like the image mockup bottom waves */}
+            {/* Smooth trendline graphics */}
             <div className="absolute inset-x-0 bottom-0 h-8 sm:h-10 w-full opacity-60 pointer-events-none">
               <svg width="100%" height="100%" viewBox="0 0 250 40" preserveAspectRatio="none">
                 <defs>
@@ -2778,7 +2795,7 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
             </div>
 
             {stat.trend && (
-              <span className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 text-[7px] sm:text-[7.5px] font-mono font-black border border-emerald-500 bg-emerald-50 text-emerald-700 px-1 py-0.5 leading-none">
+              <span className="absolute top-3 right-3 sm:top-4 sm:right-4 text-[9px] font-semibold rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 px-2 py-0.5 leading-none">
                 {stat.trend}
               </span>
             )}
@@ -2786,74 +2803,74 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
         ))}
       </div>
 
-      {/* PROMINENT TOP PANEL: Department Breakdown (เห็นเด่นชัดทันทีด้านบน ไม่ต้องเลื่อนลง) */}
-      <div className="bg-white border-2 border-slate-900 p-3.5 sm:p-5 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)]">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b-2 border-slate-900">
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="p-1.5 sm:p-2 border-2 border-slate-900 bg-blue-600 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] shrink-0">
-              <Building2 className="w-4 h-4 sm:w-5 sm:h-5" />
+      {/* PROMINENT TOP PANEL: Department Breakdown (iOS Liquid Glass) */}
+      <div className="liquid-glass-card p-4 sm:p-6 rounded-3xl border border-white/80 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-slate-200/60">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-md shadow-blue-500/20 shrink-0">
+              <Building2 className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-sm sm:text-base font-black uppercase tracking-tight text-slate-900 font-sans">
+                <h4 className="text-sm sm:text-base font-bold text-slate-900 font-sans">
                   สรุปสต็อกแยกตามแผนก
                 </h4>
-                <span className="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300 font-mono">
+                <span className="px-2 py-0.5 text-[10px] font-semibold bg-blue-500/10 text-blue-700 rounded-full border border-blue-500/20 font-mono">
                   {departmentStats.length} แผนก
                 </span>
               </div>
-              <p className="text-[10px] sm:text-[11px] font-mono text-slate-500 uppercase tracking-tight">
-                DEPARTMENT INVENTORY BREAKDOWN
+              <p className="text-[11px] text-slate-400">
+                Department Inventory Breakdown
               </p>
             </div>
           </div>
 
           {/* Grand Total Highlight Badge */}
-          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-3 bg-slate-900 text-white px-3 py-2 sm:px-4 sm:py-2 border border-slate-900 shadow-[2px_2px_0px_0px_rgba(59,130,246,1)]">
-            <span className="text-[10px] sm:text-[11px] font-mono uppercase text-slate-300 tracking-wider">
+          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 bg-white/80 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/90 shadow-sm">
+            <span className="text-xs text-slate-500 font-medium">
               ยอดคงคลังรวมทุกแผนก:
             </span>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
+              <span className="text-xl sm:text-2xl font-extrabold font-mono text-blue-600">
                 {grandTotalQty.toLocaleString()}
               </span>
-              <span className="text-[11px] sm:text-xs font-bold text-slate-300 font-sans uppercase">
+              <span className="text-xs font-semibold text-slate-600 font-sans">
                 ชิ้น
               </span>
-              <span className="text-[9px] sm:text-[10px] text-slate-400 font-mono ml-1">
+              <span className="text-[11px] text-slate-400 font-mono ml-1">
                 ({filteredItems.length} รายการ)
               </span>
             </div>
           </div>
         </div>
 
-        {/* Department Grid: View all departments immediately without scrolling */}
+        {/* Department Grid: View all departments in iOS Liquid Glass Cards */}
         {departmentStats.length === 0 ? (
-          <div className="py-8 text-center text-xs font-bold font-sans text-slate-400 uppercase italic">
+          <div className="py-8 text-center text-xs font-semibold text-slate-400 italic">
             ไม่พบข้อมูลสินค้าคงคลังในระบบ
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 pt-2">
             {departmentStats.map((dept, idx) => {
               const pct = grandTotalQty > 0 ? (dept.totalQty / grandTotalQty) * 100 : 0;
               return (
                 <div 
                   key={idx}
                   onClick={() => onNavigateToInventory?.(dept.name)}
-                  className="bg-slate-50/90 border-2 border-slate-200 hover:border-slate-900 p-3.5 flex flex-col justify-between transition-all duration-150 hover:shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] group cursor-pointer relative"
+                  className="bg-white/60 backdrop-blur-md border border-white/80 hover:border-blue-400/60 p-4 rounded-2xl flex flex-col justify-between transition-all duration-200 hover:shadow-lg hover:bg-white/90 group cursor-pointer relative"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="font-sans font-black text-xs text-slate-900 uppercase truncate group-hover:text-blue-900" title={dept.name}>
+                      <span className="font-bold text-xs text-slate-900 truncate group-hover:text-blue-600 transition-colors" title={dept.name}>
                         {dept.name}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] font-mono font-black text-slate-700 bg-white border border-slate-300 px-1.5 py-0.5">
+                        <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-500/10 border border-blue-500/20 rounded-full px-2 py-0.5">
                           {pct.toFixed(1)}%
                         </span>
                         {onNavigateToInventory && (
                           <div 
-                            className="p-0.5 text-slate-400 group-hover:text-blue-700 transition-colors"
+                            className="p-1 text-slate-400 group-hover:text-blue-600 transition-colors"
                             title="ไปที่หน้าคลังสินค้า (Filter Inventory)"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
@@ -2863,26 +2880,26 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
                     </div>
 
                     <div className="flex items-baseline gap-1.5 my-1">
-                      <span className="text-2xl font-black font-mono text-blue-700 group-hover:text-blue-900 transition-colors">
+                      <span className="text-2xl font-extrabold font-mono text-slate-900 group-hover:text-blue-600 transition-colors">
                         {dept.totalQty.toLocaleString()}
                       </span>
-                      <span className="text-[11px] font-black text-slate-600 font-sans uppercase">
+                      <span className="text-xs font-semibold text-slate-500 font-sans">
                         ชิ้น
                       </span>
                     </div>
                   </div>
 
-                  <div className="space-y-1.5 pt-2">
-                    {/* Visual Progress Bar */}
-                    <div className="w-full bg-slate-200 h-2 overflow-hidden border border-slate-300">
+                  <div className="space-y-1.5 pt-3">
+                    {/* Visual iOS Progress Bar */}
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-white/80">
                       <div 
-                        className="bg-blue-600 group-hover:bg-blue-700 h-full transition-all duration-500" 
+                        className="bg-gradient-to-r from-blue-600 to-indigo-500 rounded-full h-full transition-all duration-500" 
                         style={{ width: `${Math.max(pct, 3)}%` }}
                       />
                     </div>
-                    <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
-                      <span>{dept.count.toLocaleString()} รายการ (SKUs)</span>
-                      <span className="text-slate-400">จากทั้งหมด {grandTotalQty.toLocaleString()} ชิ้น</span>
+                    <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
+                      <span>{dept.count.toLocaleString()} SKUs</span>
+                      <span>จาก {grandTotalQty.toLocaleString()} ชิ้น</span>
                     </div>
                   </div>
                 </div>
@@ -2895,40 +2912,40 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
       {/* Main split grid: Left Asset Management Table, Right Side Dashboard Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start w-full max-w-full">
         
-        {/* Left Column: Asset Management Hub TABLE */}
+        {/* Left Column: Asset Management Hub TABLE (iOS Liquid Glass) */}
         <div className="lg:col-span-8 space-y-4 w-full max-w-full overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-slate-300 pb-2">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-800 flex items-center gap-2">
-              <span className="w-2 h-2 bg-slate-950 inline-block"></span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-slate-200/60 pb-2">
+            <h3 className="text-xs font-bold tracking-tight text-slate-800 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-600 inline-block"></span>
               ASSET MANAGEMENT HUB
             </h3>
             <div className="flex items-center gap-2">
-              <span className="text-[8.5px] text-slate-500 font-mono md:hidden">← เลื่อนตารางซ้ายขวาได้ →</span>
-              <span className="text-[8.5px] font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 border border-slate-200 hidden sm:inline-block">
-                คลิกที่แถวรายการเพื่อสืบรายละเอียด (Row items searchable)
+              <span className="text-[10px] text-slate-400 font-mono md:hidden">← เลื่อนตารางซ้ายขวาได้ →</span>
+              <span className="text-[10px] font-medium text-slate-500 bg-white/70 px-2.5 py-1 rounded-full border border-white/80 hidden sm:inline-block shadow-sm">
+                คลิกที่แถวเพื่อดูรายละเอียด
               </span>
             </div>
           </div>
 
-          <div className="bg-white border-2 border-slate-900 overflow-hidden shadow-[4px_4px_0px_0px_rgba(15,23,42,1)]">
+          <div className="liquid-glass-card rounded-3xl overflow-hidden border border-white/80 shadow-md">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
-                  <tr className="bg-slate-50 border-b-2 border-slate-900 text-[8.5px] font-sans font-black text-slate-700 uppercase divide-x divide-slate-200">
-                    <th className="px-3 py-2.5 font-bold tracking-tight">CHECK-IN/OUT TIMESTAMP</th>
-                    <th className="px-3 py-2.5 font-bold tracking-tight">ACTIVITY TYPE</th>
-                    <th className="px-3 py-2.5 font-bold tracking-tight">ASSET ID</th>
-                    <th className="px-3 py-2.5 font-bold tracking-tight">STATUS</th>
-                    <th className="px-3 py-2.5 font-bold tracking-tight">INVOICE REF</th>
-                    <th className="px-3 py-2.5 font-bold tracking-tight text-right">QUANTITY</th>
-                    <th className="px-3 py-2.5 font-bold tracking-tight">HANDLED BY</th>
+                  <tr className="bg-white/70 backdrop-blur-md border-b border-slate-200/60 text-[10px] font-sans font-bold text-slate-500 uppercase">
+                    <th className="px-4 py-3 font-semibold tracking-tight">TIMESTAMP</th>
+                    <th className="px-4 py-3 font-semibold tracking-tight">ACTIVITY</th>
+                    <th className="px-4 py-3 font-semibold tracking-tight">ASSET ID</th>
+                    <th className="px-4 py-3 font-semibold tracking-tight">STATUS</th>
+                    <th className="px-4 py-3 font-semibold tracking-tight">INVOICE REF</th>
+                    <th className="px-4 py-3 font-semibold tracking-tight text-right">QUANTITY</th>
+                    <th className="px-4 py-3 font-semibold tracking-tight">HANDLED BY</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 font-mono text-[10px] text-slate-800">
+                <tbody className="divide-y divide-slate-100 font-mono text-[11px] text-slate-800">
                   {filteredLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-10 text-xs font-bold font-sans text-slate-400 uppercase italic">
-                        ไม่พบประวัติรายการเคลื่อนไหว (No synchronous transaction records)
+                      <td colSpan={7} className="text-center py-10 text-xs font-medium text-slate-400 italic">
+                        ไม่พบประวัติรายการเคลื่อนไหว
                       </td>
                     </tr>
                   ) : (
@@ -2937,61 +2954,58 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
                       const dispQty = isItemIn ? (log.qty || 1) : -Math.abs(log.qty || 1);
                       const handledByEmail = log.userId ? log.userId.slice(0, 5).toUpperCase() : 'STAFF';
 
-                      // Format specific status tags matching screenshot
-                      let statusBadge = (
-                        <span className="px-2 py-0.5 border text-[8.5px] font-extrabold leading-none tracking-tight uppercase border-emerald-500 bg-emerald-50 text-emerald-800">
+                      // iOS Pill Badges
+                      const statusBadge = isItemIn ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-tight uppercase border border-emerald-500/20 bg-emerald-500/10 text-emerald-700">
                           IN-STOCK
                         </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-tight uppercase border border-rose-500/20 bg-rose-500/10 text-rose-700">
+                          OUT-OF-STOCK
+                        </span>
                       );
-                      if (!isItemIn) {
-                        statusBadge = (
-                          <span className="px-2 py-0.5 border text-[8.5px] font-extrabold leading-none tracking-tight uppercase border-rose-500 bg-rose-50 text-rose-800">
-                            OUT-OF-STOCK
-                          </span>
-                        );
-                      }
 
                       return (
                         <tr 
                           key={idx} 
                           onClick={() => setSelectedLog(log)}
-                          className="hover:bg-blue-50/40 divide-x divide-slate-200 cursor-pointer transition-colors"
+                          className="hover:bg-blue-50/40 cursor-pointer transition-colors"
                         >
-                          <td className="px-3 py-2.5 font-bold text-slate-500 whitespace-nowrap">
+                          <td className="px-4 py-3 font-medium text-slate-400 whitespace-nowrap text-[10px]">
                             {formatLogDate(log.date)}
                           </td>
-                          <td className="px-3 py-2.5 whitespace-nowrap">
+                          <td className="px-4 py-3 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               {isItemIn ? (
-                                <div className="p-1 border border-emerald-300 bg-emerald-50 text-emerald-600 shrink-0">
-                                  <ArrowDownLeft className="w-3 h-3" />
+                                <div className="p-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 shrink-0">
+                                  <ArrowDownLeft className="w-3.5 h-3.5" />
                                 </div>
                               ) : (
-                                <div className="p-1 border border-rose-300 bg-rose-50 text-rose-600 shrink-0">
-                                  <ArrowUpRight className="w-3 h-3" />
+                                <div className="p-1.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-600 shrink-0">
+                                  <ArrowUpRight className="w-3.5 h-3.5" />
                                 </div>
                               )}
-                              <span className="font-black text-slate-900 uppercase font-sans tracking-tight text-[9.5px]">
-                                {isItemIn ? 'STOCK RECEIVED' : 'ASSET DEPLOYED'}
+                              <span className="font-semibold text-slate-900 uppercase font-sans text-xs">
+                                {isItemIn ? 'Stock Received' : 'Asset Deployed'}
                               </span>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 font-bold text-slate-950 font-mono break-all whitespace-nowrap max-w-[120px] truncate" title={log.serialNo}>
+                          <td className="px-4 py-3 font-bold text-slate-900 font-mono break-all whitespace-nowrap max-w-[120px] truncate" title={log.serialNo}>
                             {getDisplaySerial(log.serialNo)}
                           </td>
-                          <td className="px-3 py-2.5 whitespace-nowrap">
+                          <td className="px-4 py-3 whitespace-nowrap">
                             {statusBadge}
                           </td>
-                          <td className="px-3 py-2.5 font-semibold text-slate-600 truncate max-w-[100px] whitespace-nowrap" title={log.invoiceNo}>
+                          <td className="px-4 py-3 text-slate-500 truncate max-w-[100px] whitespace-nowrap text-xs" title={log.invoiceNo}>
                             {log.invoiceNo || 'MANUAL-ADD'}
                           </td>
                           <td className={cn(
-                            "px-3 py-2.5 text-right font-black",
+                            "px-4 py-3 text-right font-extrabold font-mono",
                             dispQty < 0 ? 'text-rose-600' : 'text-slate-900'
                           )}>
                             {dispQty}
                           </td>
-                          <td className="px-3 py-2.5 font-semibold text-slate-500 whitespace-nowrap">
+                          <td className="px-4 py-3 font-medium text-slate-400 whitespace-nowrap text-[11px]">
                             Staff ({handledByEmail})
                           </td>
                         </tr>
@@ -3004,39 +3018,39 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
           </div>
         </div>
 
-        {/* Right Sidebar layout */}
+        {/* Right Sidebar layout (iOS Liquid Glass Cards) */}
         <div className="lg:col-span-4 space-y-6">
           
           {/* Card 1: CORE STATUS Panel */}
-          <div className="bg-[#0c1527] text-white p-6 border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] relative overflow-hidden min-h-[160px] flex flex-col justify-between">
+          <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white p-6 border border-white/10 shadow-xl relative overflow-hidden min-h-[160px] flex flex-col justify-between">
             <div className="relative z-10 space-y-4">
               <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-emerald-400 animate-pulse shrink-0" />
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-300/80">CORE STATUS</h4>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-300">CORE STATUS</h4>
               </div>
-              <h4 className="text-xl font-bold leading-tight uppercase tracking-tight scale-y-105 origin-left text-white font-sans">
-                ALL SYSTEMS STABILIZED.<br/>FLOW OPTIMIZED.
+              <h4 className="text-xl font-bold leading-tight tracking-tight text-white font-sans">
+                All Systems Active.<br/>Ledger Synchronized.
               </h4>
             </div>
             
             <div className="relative z-10">
-              <div className="w-full h-px bg-slate-800 my-3" />
-              <p className="text-[9px] opacity-60 uppercase font-mono leading-relaxed">
-                DISTRIBUTED LEDGER SYNC COMPLETE.<br/>
-                WAIT_STATS: <span className="text-emerald-400 font-bold">IDLE</span>.
+              <div className="w-full h-px bg-white/10 my-3" />
+              <p className="text-[10px] text-slate-300/80 font-mono leading-relaxed">
+                DISTRIBUTED LEDGER ONLINE<br/>
+                STATUS: <span className="text-emerald-400 font-bold">OPERATIONAL</span>
               </p>
             </div>
-            <Package className="absolute -right-16 -bottom-16 w-52 h-52 opacity-[0.03] -rotate-12 pointer-events-none" />
+            <Package className="absolute -right-12 -bottom-12 w-48 h-48 opacity-[0.04] -rotate-12 pointer-events-none" />
           </div>
 
-          {/* Card 2: INVENTORY COMPOSITION (Donut Chart with exact state values) */}
-          <div className="bg-white border-2 border-slate-900 p-5 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] space-y-4">
-            <div className="border-b border-slate-200 pb-1.5 flex items-center justify-between">
-              <h4 className="text-[10.5px] font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 bg-blue-600 inline-block rounded-full"></span>
-                INVENTORY COMPOSITION
+          {/* Card 2: INVENTORY COMPOSITION (Donut Chart) */}
+          <div className="liquid-glass-card p-6 rounded-3xl border border-white/80 space-y-4">
+            <div className="border-b border-slate-200/60 pb-2 flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <span className="w-2 h-2 bg-blue-600 inline-block rounded-full"></span>
+                Inventory Composition
               </h4>
-              <span className="text-[7.5px] font-mono font-black text-slate-400">{totalCount} UNITS</span>
+              <span className="text-[10px] font-mono font-semibold text-slate-400">{totalCount} UNITS</span>
             </div>
 
             {/* Custom SVG Donut rendering counts exact to base vs deployed */}
@@ -3121,54 +3135,54 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white border-4 border-slate-900 p-6 md:p-8 w-full max-w-5xl neo-brutalism-shadow relative h-[92vh] max-h-[92vh] flex flex-col"
+            className="bg-white/90 backdrop-blur-2xl border border-white/80 p-6 md:p-8 w-full max-w-5xl rounded-3xl shadow-2xl relative h-[92vh] max-h-[92vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close Button */}
             <button 
               onClick={() => setSelectedLog(null)}
-              className="absolute top-4 right-4 border-2 border-slate-900 bg-white hover:bg-red-500 hover:text-white p-1.5 transition-colors neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] cursor-pointer"
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
               aria-label="Close dialog"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
 
             {/* Modal Heading */}
-            <div className="mb-6">
-              <span className="text-[9px] uppercase font-black text-blue-600 tracking-widest bg-blue-50 px-2.5 py-1 border-2 border-slate-900 leading-none inline-block mb-2">
+            <div className="mb-5">
+              <span className="text-[10px] uppercase font-bold text-blue-600 tracking-wider bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20 inline-block mb-2">
                 รายละเอียดรอบกิจกรรมระบบ (Activity Cycle Detail)
               </span>
-              <h3 className="text-xl md:text-2xl font-black font-mono tracking-tighter text-slate-900 break-all bg-slate-50 border-2 border-slate-900 px-4 py-2 mt-1">
+              <h3 className="text-lg md:text-xl font-bold font-mono tracking-tight text-slate-900 break-all bg-white/70 border border-white/80 rounded-2xl px-4 py-2.5 mt-1 shadow-sm">
                 INVOICE / BILL REF: #{selectedLog.invoiceNo}
               </h3>
             </div>
 
             {/* Primary Log Details Segment */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 border-2 border-slate-900 mb-4 text-xs font-bold uppercase tracking-tight">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white/60 p-4 rounded-2xl border border-white/80 mb-4 text-xs font-medium tracking-tight shadow-sm">
               <div className="space-y-1">
-                <p className="text-[8.5px] text-slate-400 font-black">เลขคุมสินทรัพย์ (Selected Asset):</p>
-                <p className="text-slate-800 font-mono text-xs leading-snug font-black">{selectedLog.serialNo}</p>
+                <p className="text-[10px] text-slate-400 font-semibold">เลขคุมสินทรัพย์ (Selected Asset):</p>
+                <p className="text-slate-800 font-mono text-xs leading-snug font-bold">{selectedLog.serialNo}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-[8.5px] text-slate-400 font-black">ประเภทรายการ (Type):</p>
+                <p className="text-[10px] text-slate-400 font-semibold">ประเภทรายการ (Type):</p>
                 <div>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 border-2 font-black text-[9px] uppercase tracking-tighter ${
-                    selectedLog.transactionType === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-600'
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-tight ${
+                    selectedLog.transactionType === 'IN' ? 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-700' : 'border border-rose-500/20 bg-rose-500/10 text-rose-700'
                   }`}>
                     {selectedLog.transactionType}
                   </span>
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-[8.5px] text-slate-400 font-black">เวลาทำรายการ (Timestamp):</p>
+                <p className="text-[10px] text-slate-400 font-semibold">เวลาทำรายการ (Timestamp):</p>
                 <p className="text-slate-800 font-mono text-[10px] leading-snug">
                   {selectedLog.date?.toDate().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}<br />
                   @ {selectedLog.date?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
                 </p>
               </div>
               <div className="space-y-1">
-                <p className="text-[8.5px] text-slate-400 font-black">ใบขนขาเข้า (Import Entry):</p>
-                <p className="font-bold text-blue-600 italic text-[11px] leading-snug">
+                <p className="text-[10px] text-slate-400 font-semibold">ใบขนขาเข้า (Import Entry):</p>
+                <p className="font-semibold text-blue-600 text-[11px] leading-snug">
                   {selectedLog.importEntryNo || 'N/A'}<br />
                   {selectedLog.importEntryLineNo ? `(LINE: ${selectedLog.importEntryLineNo})` : ''}
                 </p>
@@ -3176,73 +3190,72 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
             </div>
 
             {/* Related items header */}
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900 mb-3 flex items-center justify-between">
+            <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <History className="w-4 h-4 opacity-70" />
-                <span>สินทรัพย์ที่นำเข้า-ส่งออกในวงงานรอบเดียวกัน (Items in this Shipment Batch)</span>
+                <History className="w-4 h-4 text-blue-600" />
+                <span>สินทรัพย์ที่นำเข้า-ส่งออกในวงงานรอบเดียวกัน (Shipment Batch)</span>
               </span>
-              <span className="bg-slate-900 text-white px-2.5 py-0.5 text-[9px] font-mono font-black border-2 border-slate-900">
+              <span className="bg-blue-500/10 text-blue-700 px-3 py-0.5 text-[10px] font-mono font-bold rounded-full border border-blue-500/20">
                 {logs.filter(l => l.invoiceNo === selectedLog.invoiceNo).length} ITEMS
               </span>
             </h4>
 
             {/* Co-invoice batch records list viewport */}
-            <div className="flex-1 overflow-y-auto pr-2 space-y-3 border-2 border-slate-900 bg-slate-50/70 p-4 neo-brutalism-shadow min-h-0">
+            <div className="flex-1 overflow-y-auto pr-2 space-y-2.5 rounded-2xl border border-slate-200/60 bg-white/50 p-3 min-h-0">
               {logs
                 .filter(l => l.invoiceNo === selectedLog.invoiceNo)
                 .map((log, index) => (
                   <div 
                     key={index} 
                     className={cn(
-                      "bg-white border-2 border-slate-900 p-3.5 transition-all relative overflow-hidden flex flex-col md:flex-row md:items-center gap-2 md:gap-4",
-                      log.serialNo === selectedLog.serialNo ? "border-blue-600 ring-2 ring-blue-600/30 bg-blue-50/10" : "neo-brutalism-shadow-sm"
+                      "bg-white/80 backdrop-blur-md rounded-2xl border p-3 transition-all relative overflow-hidden flex flex-col md:flex-row md:items-center gap-2 md:gap-4 shadow-sm",
+                      log.serialNo === selectedLog.serialNo ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/50" : "border-white/80"
                     )}
                   >
                     {/* Left vertical status indicator strip */}
-                    <div className={`w-1.5 h-full absolute left-0 top-0 ${log.transactionType === 'IN' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                    <div className={`w-1 h-full absolute left-0 top-0 rounded-l-2xl ${log.transactionType === 'IN' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                     
                     {/* Responsive Grid Layout for Info Fields */}
-                    <div className="pl-3 flex-1 grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 items-center">
+                    <div className="pl-2.5 flex-1 grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 items-center">
                       
                       {/* Asset ID (col-span-4) */}
                       <div className="md:col-span-4 flex flex-col">
-                        <span className="text-[7.5px] uppercase text-slate-400 font-black leading-none mb-0.5">Asset ID</span>
-                        <span className="text-xs font-black font-mono tracking-tight text-slate-800 truncate" title={log.serialNo}>
+                        <span className="text-[8px] uppercase text-slate-400 font-semibold leading-none mb-0.5">Asset ID</span>
+                        <span className="text-xs font-bold font-mono tracking-tight text-slate-800 truncate" title={log.serialNo}>
                           {log.serialNo}
                         </span>
                       </div>
 
                       {/* Transaction Status (col-span-2) */}
                       <div className="md:col-span-2 flex items-center">
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 border border-slate-900 font-black text-[8px] uppercase tracking-tighter ${
-                          log.transactionType === 'IN' ? 'border-emerald-600 bg-emerald-50 text-emerald-600' : 'border-red-600 bg-red-50 text-red-600'
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[9px] uppercase tracking-tight ${
+                          log.transactionType === 'IN' ? 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-700' : 'border border-rose-500/20 bg-rose-500/10 text-rose-700'
                         }`}>
                           {log.transactionType}
                         </span>
                       </div>
 
                       {/* Routing Path (col-span-6) */}
-                      <div className="md:col-span-6 flex items-center justify-between gap-1.5 min-w-0 bg-slate-50 px-2 py-1.5 border border-slate-200">
+                      <div className="md:col-span-6 flex items-center justify-between gap-1.5 min-w-0 bg-white/70 px-2.5 py-1.5 rounded-xl border border-slate-200/60">
                         <div className="flex-1 min-w-0">
-                          <span className="text-[7.5px] uppercase text-slate-400 font-black leading-none block mb-0.5">Route Range</span>
+                          <span className="text-[8px] uppercase text-slate-400 font-semibold leading-none block mb-0.5">Route</span>
                           <div className="flex items-center gap-1.5">
-                            <span className="truncate text-slate-700 font-black text-[9px] max-w-[45%]" title={log.origin}>
+                            <span className="truncate text-slate-700 font-medium text-[10px] max-w-[45%]" title={log.origin}>
                               {log.origin}
                             </span>
                             <div className="flex items-center gap-0.5 opacity-40 shrink-0">
-                              <span className="w-1 h-1 bg-slate-900 rounded-full" />
-                              <ArrowRight className="w-3.5 h-3.5 text-slate-900" />
+                              <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
                             </div>
-                            <span className="truncate text-blue-600 font-black text-[9px] max-w-[45%]" title={log.destination}>
+                            <span className="truncate text-blue-600 font-medium text-[10px] max-w-[45%]" title={log.destination}>
                               {log.destination}
                             </span>
                           </div>
                         </div>
                         
                         {/* Time indicator */}
-                        <div className="text-right shrink-0 border-l border-slate-200 pl-2">
-                          <p className="text-[7px] uppercase text-slate-400 font-black leading-none mb-0.5">Time</p>
-                          <p className="text-[9px] font-mono font-bold text-slate-700 leading-none">
+                        <div className="text-right shrink-0 border-l border-slate-200/80 pl-2">
+                          <p className="text-[8px] uppercase text-slate-400 font-medium leading-none mb-0.5">Time</p>
+                          <p className="text-[10px] font-mono text-slate-700 leading-none font-semibold">
                             {log.date?.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
                           </p>
                         </div>
@@ -3254,10 +3267,10 @@ export function Dashboard({ onNavigateToInventory }: DashboardProps = {}) {
             </div>
 
             {/* Close Button Panel */}
-            <div className="mt-5 flex justify-end gap-3 pt-4 border-t-2 border-slate-100 shrink-0">
+            <div className="mt-4 flex justify-end gap-3 pt-3 border-t border-slate-200/50 shrink-0">
               <button 
                 onClick={() => setSelectedLog(null)}
-                className="px-6 py-2 bg-slate-900 hover:bg-slate-850 text-white border-2 border-slate-900 text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer neo-brutalism-shadow active:translate-x-0.5 active:translate-y-0.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shadow-md active:scale-95"
               >
                 ปิดหน้าต่าง
               </button>
@@ -3522,25 +3535,27 @@ export function SettingsView() {
   };
 
   return (
-    <div className="space-y-12">
-      <div className="border-b-4 border-slate-900 pb-8">
-        <h2 className="text-4xl font-black uppercase tracking-tighter italic">System Configuration</h2>
-        <p className="text-xs font-bold uppercase tracking-widest opacity-40 mt-2">Administrative Control & Global State Management</p>
+    <div className="space-y-8 sm:space-y-10 animate-fade-in">
+      <div className="border-b border-white/60 pb-6">
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">System Configuration</h2>
+        <p className="text-xs font-medium text-slate-500 mt-1">Administrative Control & Global State Management</p>
       </div>
 
-      {/* MASTER INVENTORY UPLOADER CONTAINER */}
-      <div className="p-8 border-4 border-slate-900 bg-white space-y-6 neo-brutalism-shadow">
-        <div className="border-b-2 border-slate-200 pb-4">
+      {/* MASTER INVENTORY UPLOADER CONTAINER (iOS Liquid Glass) */}
+      <div className="liquid-glass-card p-6 sm:p-8 rounded-3xl border border-white/80 shadow-md space-y-6">
+        <div className="border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3 text-emerald-600">
-            <Upload className="w-6 h-6" />
-            <h3 className="text-xl font-black uppercase tracking-tight">นำเข้า Master Inventory (Import Master File)</h3>
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center border border-emerald-200/50 shadow-xs">
+              <Upload className="w-5 h-5" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800">นำเข้า Master Inventory (Import Master File)</h3>
           </div>
-          <p className="text-[10px] uppercase font-bold text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1.5 ml-12">
             เพิ่มฐานข้อมูลสินค้าหลักโดยตรงจากไฟล์ Excel เพื่อใช้เป็นข้อมูลตั้งต้นสำหรับการจับคู่ CIPL
           </p>
         </div>
 
-        <div className="relative border-4 border-dashed border-slate-900 bg-slate-50 p-8 flex flex-col items-center justify-center text-center group hover:bg-slate-100 transition-colors">
+        <div className="relative border-2 border-dashed border-slate-200/80 hover:border-blue-400 bg-white/40 hover:bg-white/70 p-8 sm:p-10 rounded-2xl flex flex-col items-center justify-center text-center group transition-all duration-300">
           <input 
             type="file" 
             accept=".xlsx, .xls"
@@ -3550,19 +3565,21 @@ export function SettingsView() {
           />
           {isProcessing ? (
             <div className="flex flex-col items-center gap-3 py-4">
-              <Upload className="w-12 h-12 animate-bounce text-emerald-600" />
-              <span className="font-mono text-[10px] font-black uppercase text-slate-800">
+              <Upload className="w-10 h-10 animate-bounce text-emerald-600" />
+              <span className="text-xs font-bold text-slate-700">
                 กำลังนำเข้าข้อมูล Master Inventory... (PROCESSING MASTER INVENTORY...)
               </span>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-4">
-              <Upload className="w-12 h-12 text-slate-400 group-hover:text-amber-500 group-hover:scale-110 transition-all duration-300" />
-              <div className="space-y-2">
-                <span className="font-mono text-xs font-black uppercase text-slate-800 block">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center border border-blue-200/50 group-hover:scale-105 transition-transform">
+                <Upload className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs sm:text-sm font-semibold text-slate-800 block">
                   คลิกที่นี่ หรือ ลากไฟล์ Excel มาวาง เพื่อดำเนินการอัปโหลด
                 </span>
-                <span className="text-[9px] uppercase font-bold text-slate-400 block">
+                <span className="text-[11px] text-slate-400 block">
                   รองรับเอกสารนามสกุล .xlsx และ .xls บันทึกข้อมูลคอลัมน์ Part No, Serial No, Description, COO, และอื่นๆ
                 </span>
               </div>
@@ -3572,11 +3589,11 @@ export function SettingsView() {
 
         {/* FEEDBACK STATUS ALERTS */}
         {success && (
-          <div className="flex items-start gap-4 bg-emerald-50 border-4 border-emerald-500 p-6 text-emerald-800 transition-all font-mono">
-            <CheckCircle2 className="w-6 h-6 shrink-0 text-emerald-600" />
+          <div className="flex items-start gap-3.5 bg-emerald-500/10 border border-emerald-500/30 p-4 sm:p-5 rounded-2xl text-emerald-800 transition-all">
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 mt-0.5" />
             <div>
-              <h4 className="text-sm font-black uppercase tracking-wider">นำเข้าข้อมูลสินค้าสำเร็จ! (Import Success)</h4>
-              <p className="text-xs uppercase font-bold mt-1 text-emerald-700">
+              <h4 className="text-xs sm:text-sm font-bold">นำเข้าข้อมูลสินค้าสำเร็จ! (Import Success)</h4>
+              <p className="text-xs font-medium mt-0.5 text-emerald-700">
                 เพิ่มรายการสินค้าในไฟล์ Master Inventory ลงในฐานข้อมูลผู้ใช้งานของคุณเรียบร้อยแล้ว ทั้งหมด {importedCount} รายการ
               </p>
             </div>
@@ -3584,11 +3601,11 @@ export function SettingsView() {
         )}
 
         {error && (
-          <div className="flex items-start gap-4 bg-red-50 border-4 border-red-500 p-6 text-red-800 transition-all font-mono">
-            <AlertCircle className="w-6 h-6 shrink-0 text-red-600" />
+          <div className="flex items-start gap-3.5 bg-rose-500/10 border border-rose-500/30 p-4 sm:p-5 rounded-2xl text-rose-800 transition-all">
+            <AlertCircle className="w-5 h-5 shrink-0 text-rose-600 mt-0.5" />
             <div>
-              <h4 className="text-sm font-black uppercase tracking-wider">เกิดข้อผิดพลาดในการนำเข้าข้อมูล (Import Failed)</h4>
-              <p className="text-xs uppercase font-bold mt-1 text-red-600">
+              <h4 className="text-xs sm:text-sm font-bold">เกิดข้อผิดพลาดในการนำเข้าข้อมูล (Import Failed)</h4>
+              <p className="text-xs font-medium mt-0.5 text-rose-600">
                 {error}
               </p>
             </div>
@@ -3596,89 +3613,93 @@ export function SettingsView() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-        <div className="space-y-8">
-          <div className="flex items-center gap-4 text-blue-600">
-            <ShieldAlert className="w-8 h-8" />
-            <h3 className="text-xl font-black uppercase tracking-tight">Danger Zone</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="flex items-center gap-3 text-rose-600">
+            <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center border border-rose-200/50">
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-slate-800">Danger Zone</h3>
           </div>
           
-          <div className="p-8 border-4 border-slate-900 bg-red-50 space-y-8 neo-brutalism-shadow">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Database className="w-5 h-5 text-red-600" />
-                <h4 className="text-sm font-black uppercase tracking-widest text-red-600">Inventory Wipe</h4>
+          <div className="liquid-glass-card p-6 sm:p-8 rounded-3xl border border-rose-200/60 bg-rose-50/40 backdrop-blur-xl shadow-md space-y-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-rose-600" />
+                <h4 className="text-xs sm:text-sm font-bold text-rose-700">Inventory Wipe</h4>
               </div>
-              <p className="text-[10px] uppercase font-bold leading-relaxed text-slate-500 max-w-sm">
+              <p className="text-xs text-slate-500 max-w-sm">
                 Irreversibly delete all master inventory records. This action does not affect transaction logs but will leave the base stock at zero.
               </p>
               <HoldToConfirmButton 
                 label="Clear Inventory"
                 subLabel="Hold for 3 seconds to confirm"
                 onConfirm={() => wipeAllData('inventory')}
-                className="w-full bg-white text-red-600 border-red-600"
+                className="w-full"
               />
             </div>
 
-            <div className="w-full h-px bg-red-200" />
+            <div className="w-full h-px bg-rose-200/60" />
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <History className="w-5 h-5 text-red-600" />
-                <h4 className="text-sm font-black uppercase tracking-widest text-red-600">Journal Wipe</h4>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <History className="w-4 h-4 text-rose-600" />
+                <h4 className="text-xs sm:text-sm font-bold text-rose-700">Journal Wipe</h4>
               </div>
-              <p className="text-[10px] uppercase font-bold leading-relaxed text-slate-500 max-w-sm">
+              <p className="text-xs text-slate-500 max-w-sm">
                 Clear all transaction logs and movement history. Master inventory state will remain intact, but audit trails will be lost.
               </p>
               <HoldToConfirmButton 
                 label="Clear Activity Logs"
                 subLabel="Hold for 3 seconds to confirm"
                 onConfirm={() => wipeAllData('logs')}
-                className="w-full bg-white text-red-600 border-red-600"
+                className="w-full"
               />
             </div>
 
-            <div className="w-full h-px bg-red-200" />
+            <div className="w-full h-px bg-rose-200/60" />
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Trash2 className="w-5 h-5 text-red-900" />
-                <h4 className="text-sm font-black uppercase tracking-widest text-red-900">Total System Reset</h4>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-rose-700" />
+                <h4 className="text-xs sm:text-sm font-bold text-rose-800">Total System Reset</h4>
               </div>
-              <p className="text-[10px] uppercase font-bold leading-relaxed text-slate-400 max-w-sm">
+              <p className="text-xs text-slate-500 max-w-sm">
                 Full factory reset. Deletes all inventory and logs. This cannot be undone.
               </p>
               <HoldToConfirmButton 
                 label="Factory Wipe"
                 subLabel="Hold for 3 seconds to confirm total reset"
                 onConfirm={() => wipeAllData('all')}
-                className="w-full bg-slate-900 text-white"
+                className="w-full"
               />
             </div>
           </div>
         </div>
 
-        <div className="space-y-8">
-          <div className="flex items-center gap-4 text-slate-400">
-            <Activity className="w-8 h-8" />
-            <h3 className="text-xl font-black uppercase tracking-tight">System Info</h3>
+        <div className="space-y-4 sm:space-y-6">
+          <div className="flex items-center gap-3 text-slate-500">
+            <div className="w-8 h-8 rounded-xl bg-slate-500/10 text-slate-600 flex items-center justify-center border border-slate-200/50">
+              <Activity className="w-4 h-4" />
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-slate-800">System Info</h3>
           </div>
           
-          <div className="p-8 border-4 border-slate-900 bg-white space-y-6 neo-brutalism-shadow">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase opacity-30">Node_Identifier</label>
-              <p className="text-sm font-mono font-bold">AIS-PRODUCTION-NODE-851323226653</p>
+          <div className="liquid-glass-card p-6 sm:p-8 rounded-3xl border border-white/80 shadow-md space-y-5">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Node_Identifier</label>
+              <p className="text-xs sm:text-sm font-mono font-semibold text-slate-700">AIS-PRODUCTION-NODE-851323226653</p>
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase opacity-30">Status</label>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</label>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse border border-slate-900" />
-                <p className="text-sm font-mono font-bold">STABLE_ONLINE</p>
+                <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse ring-4 ring-emerald-500/20" />
+                <p className="text-xs sm:text-sm font-mono font-semibold text-emerald-600">STABLE_ONLINE</p>
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase opacity-30">Protocol</label>
-              <p className="text-sm font-mono font-bold italic">HTTPS_SECURE_WSS</p>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Protocol</label>
+              <p className="text-xs sm:text-sm font-mono font-semibold text-slate-700">HTTPS_SECURE_WSS</p>
             </div>
           </div>
         </div>

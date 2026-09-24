@@ -58,19 +58,19 @@ export default function App() {
       <Layout activeTab={activeTab} setActiveTab={setActiveTab} user={user}>
         {renderContent()}
 
-        {/* Floating Quick AI Button (compact circular FAB) */}
+        {/* Floating Quick AI Button (iOS Liquid Glass bubble) */}
         {activeTab !== 'ai_chat' && (
-          <div className="fixed bottom-16 right-3.5 md:bottom-14 md:right-6 z-30">
+          <div className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-30">
             <button
               onClick={() => setIsQuickAiOpen(true)}
-              className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 border-2 border-slate-900 shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 flex items-center justify-center transition-all cursor-pointer group"
+              className="relative w-12 h-12 rounded-full bg-gradient-to-tr from-amber-400 via-amber-300 to-amber-200 text-slate-900 border border-white/80 shadow-[0_8px_25px_rgba(245,158,11,0.35)] active:scale-95 flex items-center justify-center transition-all cursor-pointer backdrop-blur-xl group hover:shadow-[0_12px_30px_rgba(245,158,11,0.45)]"
               title="ถาม AI สต็อก (Gemini Assistant)"
               aria-label="เปิดถาม AI สต็อก"
             >
-              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 fill-slate-950 text-slate-950" />
+              <Sparkles className="w-5 h-5 fill-slate-900 text-slate-900 transition-transform group-hover:scale-110" />
               <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-600 border border-white text-[8px] font-mono text-white font-black items-center justify-center">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-600 border border-white text-[8px] font-mono text-white font-black items-center justify-center shadow-sm">
                   AI
                 </span>
               </span>
@@ -78,10 +78,10 @@ export default function App() {
           </div>
         )}
 
-        {/* Quick AI Drawer / Modal */}
+        {/* Quick AI Drawer / Modal (iOS Liquid Glass Sheet) */}
         {isQuickAiOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-950/50 p-2 sm:p-4 backdrop-blur-[1px]">
-            <div className="w-full max-w-2xl h-[95vh] sm:h-[90vh] bg-white border-2 sm:border-4 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] sm:shadow-[8px_8px_0px_0px_rgba(15,23,42,1)] flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-center justify-center sm:justify-end bg-slate-900/30 backdrop-blur-md p-2 sm:p-6 animate-in fade-in duration-200">
+            <div className="w-full max-w-2xl h-[92vh] sm:h-[88vh] bg-white/85 backdrop-blur-2xl border border-white/80 shadow-2xl rounded-3xl overflow-hidden flex flex-col">
               <AiAssistant onClose={() => setIsQuickAiOpen(false)} />
             </div>
           </div>
