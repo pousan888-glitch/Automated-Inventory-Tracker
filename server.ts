@@ -119,21 +119,43 @@ Your job is to:
       });
 
       const genAI = getGenAI();
-      const response = await genAI.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents,
-        config: {
-          systemInstruction,
-          temperature: 0.2,
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.LOW,
-          },
-        },
-      });
+      const CANDIDATE_MODELS = [
+        'gemini-3.5-flash-lite',
+        'gemini-flash-latest',
+        'gemini-3.8-flash',
+        'gemini-3.1-flash-lite',
+      ];
+
+      let responseText = '';
+      let lastError: any = null;
+
+      for (const modelName of CANDIDATE_MODELS) {
+        try {
+          const response = await genAI.models.generateContent({
+            model: modelName,
+            contents,
+            config: {
+              systemInstruction,
+              temperature: 0.2,
+            },
+          });
+          if (response && response.text) {
+            responseText = response.text;
+            break;
+          }
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`[AI Chat] Model ${modelName} encountered an issue: ${err?.message || err}. Trying next fallback candidate...`);
+        }
+      }
+
+      if (!responseText && lastError) {
+        throw lastError;
+      }
 
       res.json({
         success: true,
-        reply: response.text || 'ไม่มีข้อมูลตอบกลับจากระบบ',
+        reply: responseText || 'ขออภัย ไม่สามารถประมวลผลคำตอบได้ กรุณาลองใหม่อีกครั้ง',
       });
     } catch (error: any) {
       console.error('Error generating AI response:', error);

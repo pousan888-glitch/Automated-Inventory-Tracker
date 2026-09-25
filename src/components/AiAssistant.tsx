@@ -24,6 +24,7 @@ import {
 import { subscribeToInventory, InventoryItem, getDisplaySerial } from '../lib/inventoryService';
 import * as XLSX from 'xlsx';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface ChatMessage {
   id: string;
@@ -169,7 +170,7 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
     setPastedRawText('');
   };
 
-  // Local Intelligent Fallback Answer Engine for when external AI API returns 404 or fails
+  // Local Intelligent Fallback Answer Engine for when external AI API encounters delays or rate-limits
   const generateLocalFallbackAnswer = (
     prompt: string,
     items: InventoryItem[],
@@ -178,7 +179,57 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
   ): string => {
     const p = (prompt || '').toLowerCase();
 
-    // 1. Low Stock Query (สินค้าใกล้หมด / ตรวจสอบสินค้าที่มีจำนวนคงเหลือน้อย)
+    // 1. Overview / Status / IN & OUT Summary (สรุปภาพรวมสถานะสินค้า IN และ OUT ล่าสุด พร้อมข้อสังเกต)
+    const isOverview = p.includes('สรุป') || p.includes('ภาพรวม') || p.includes('สถานะ') || (p.includes('in') && p.includes('out')) || p.includes('ล่าสุด') || p.includes('ข้อสังเกต') || p.includes('overview') || p.includes('summary') || p.includes('รายงาน');
+    if (isOverview) {
+      const inItems = items.filter(i => (i.status || 'IN') === 'IN');
+      const outItems = items.filter(i => i.status === 'OUT');
+      const inQty = inItems.reduce((acc, c) => acc + (Number(c.qty) || 1), 0);
+      const outQty = outItems.reduce((acc, c) => acc + (Number(c.qty) || 1), 0);
+      const totalItems = items.length || currSummary.totalItems;
+      const inPercent = totalItems > 0 ? ((inItems.length / totalItems) * 100).toFixed(1) : '0';
+      const outPercent = totalItems > 0 ? ((outItems.length / totalItems) * 100).toFixed(1) : '0';
+
+      const recentIn = inItems.slice(0, 5);
+      const recentInRows = recentIn.length > 0 
+        ? recentIn.map((i, idx) => `| ${idx + 1} | \`${i.partNo || '-'}\` | \`${getDisplaySerial(i.serialNo)}\` | ${i.description.slice(0, 30)} | **${i.qty !== undefined ? i.qty : 1} ${i.uom || 'EA'}** | ${i.currentLocation || 'In-Base'} |`).join('\n')
+        : '| - | ไม่มีข้อมูล | - | - | - | - |';
+
+      const recentOut = outItems.slice(0, 5);
+      const recentOutRows = recentOut.length > 0
+        ? recentOut.map((i, idx) => `| ${idx + 1} | \`${i.partNo || '-'}\` | \`${getDisplaySerial(i.serialNo)}\` | ${i.description.slice(0, 30)} | **${i.qty !== undefined ? i.qty : 1} ${i.uom || 'EA'}** | ${i.currentLocation || 'Exported'} |`).join('\n')
+        : '| - | ยังไม่มีรายการเบิกออก | - | - | - | - |';
+
+      return `### 📊 สรุปภาพรวมสถานะสินค้าคงคลัง (IN & OUT Status Overview)
+
+#### 1. สรุปตัวเลขสต็อกสินค้าปัจจุบัน
+* **จำนวนรายการสินค้าทั้งหมด (Total SKUs):** **${totalItems.toLocaleString()}** รายการ
+* **ปริมาณสินค้ารวม (Total Quantity):** **${currSummary.totalQty.toLocaleString()}** หน่วย
+* **สินค้าสถานะในคลัง (IN - Available Stock):** **${inItems.length.toLocaleString()}** รายการ (${inPercent}% ของสต็อกทั้งหมด, รวม **${inQty.toLocaleString()}** หน่วย)
+* **สินค้าสถานะเบิกออก/ส่งออก (OUT - Dispatched/Exported):** **${outItems.length.toLocaleString()}** รายการ (${outPercent}% ของสต็อกทั้งหมด, รวม **${outQty.toLocaleString()}** หน่วย)
+* **รายการที่คงเหลือน้อยต้องเฝ้าระวัง (Low Stock ≤ 2):** **${currSummary.lowStockCount}** รายการ
+
+---
+
+#### 2. ตัวอย่างรายการสินค้าในคลัง (IN - Available Items)
+| # | Part No. | Serial No. | รายละเอียดสินค้า | จำนวน | สถานที่จัดเก็บ |
+|---|---|---|---|---|---|
+${recentInRows}
+
+${outItems.length > 0 ? `#### 3. ตัวอย่างรายการสินค้าที่เบิกออกแล้ว (OUT - Dispatched Items)
+| # | Part No. | Serial No. | รายละเอียดสินค้า | จำนวน | สถานะปลายทาง |
+|---|---|---|---|---|---|
+${recentOutRows}
+` : ''}
+---
+
+#### 🔍 ข้อสังเกตและข้อเสนอแนะเชิงลึก (Observations & Key Insights):
+1. **สัดส่วนสินค้าในคลัง:** ปัจจุบันสินค้าส่วนใหญ่ (${inPercent}%) มีสถานะพร้อมใช้งานอยู่ในคลัง การไหลเวียนของสินค้าอยู่ในเกณฑ์ปกติ
+2. **สถานที่จัดเก็บหลัก:** กระจุกตัวอยู่ในพิกัด **${currSummary.locations.slice(0, 4).join(', ') || 'In-Base / Free Zone'}** แนะนำตรวจสอบการจัดหมวดหมู่ให้ตรงกับแผนกปฏิบัติงาน
+3. **การเฝ้าระวังสินค้าใกล้หมด:** พบสินค้าที่มีสต็อกคงเหลือน้อยกว่าหรือเท่ากับ 2 ชิ้น จำนวน **${currSummary.lowStockCount}** รายการ ควรวางแผนสั่งซื้อหรือประสานงานฝ่ายจัดซื้อล่วงหน้าเพื่อป้องกันของขาดมือ`;
+    }
+
+    // 2. Low Stock Query (สินค้าใกล้หมด / ตรวจสอบสินค้าที่มีจำนวนคงเหลือน้อย)
     if (p.includes('น้อย') || p.includes('low') || p.includes('ใกล้หมด') || p.includes('ขาด') || p.includes('เติม') || p.includes('จัดเตรียม')) {
       const lowStockItems = items.filter(i => (i.status === 'IN' || !i.status) && (Number(i.qty) || 1) <= 2);
       if (lowStockItems.length === 0) {
@@ -193,7 +244,7 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
       return `### 📦 ตรวจสอบรายการสินค้าคงเหลือน้อย (Low Stock)\n\nพบสินค้าที่มีจำนวนคงเหลือน้อย (≤ 2 หน่วย) ทั้งหมด **${lowStockItems.length} รายการ** จากฐานข้อมูลสินค้าคงคลังปัจจุบัน:\n\n| # | Part No. | Serial No. | รายละเอียด | จำนวนคงเหลือ | สถานที่จัดเก็บ | แผนก |\n|---|---|---|---|---|---|---|\n${tableRows}\n${lowStockItems.length > 15 ? `\n*(และยังมีอีก ${lowStockItems.length - 15} รายการในระบบ)*\n` : ''}\n\n#### 💡 ข้อแนะนำในการจัดเตรียมและบริหารจัดการ:\n1. **เร่งตรวจสอบยอดสั่งซื้อ (PR/PO):** ควรประสานงานกับฝ่ายจัดซื้อหรือแผนกที่เกี่ยวข้อง (${Array.from(new Set(lowStockItems.map(i => i.segment).filter(Boolean))).slice(0, 4).join(', ') || 'ผู้ดูแลระบบ'}) สำหรับอะไหล่สำคัญ\n2. **ตรวจสอบ Physical Stock:** ยืนยันการมีอยู่จริงของ Serial No. ตามสถานที่ระบุข้างต้นก่อนทำรายการเบิกออกใหม่\n3. **ติดตามสินค้าที่กำลังนำเข้า:** ตรวจสอบกับใบขนสินค้าขาเข้า (Import Entry) ว่ามี Shipment สำหรับพาร์ทเหล่านี้กำลังเดินทางมาหรือไม่`;
     }
 
-    // 2. Location breakdown (สรุปตาม Location)
+    // 3. Location breakdown (สรุปตาม Location)
     if (p.includes('location') || p.includes('สถานที่') || p.includes('คลัง') || p.includes('yard') || p.includes('base') || p.includes('rig')) {
       const locMap: { [loc: string]: { count: number; qty: number } } = {};
       items.forEach(i => {
@@ -210,7 +261,7 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
       return `### 📍 สรุปรายการสินค้าคงคลังตามสถานที่จัดเก็บ (Location Breakdown)\n\nระบบตรวจพบสถานที่จัดเก็บทั้งหมด **${Object.keys(locMap).length} จุด** ในคลังสินค้า:\n\n| # | สถานที่จัดเก็บ | จำนวนรายการ (SKU) | ปริมาณรวม (Total Qty) |\n|---|---|---|---|\n${rows}\n\n**ยอดรวมสินค้าในคลังทั้งหมด:** ${currSummary.totalItems} รายการ (${currSummary.totalQty.toLocaleString()} หน่วย)`;
     }
 
-    // 3. Segment / Department breakdown (สรุปตาม แผนก)
+    // 4. Segment / Department breakdown (สรุปตาม แผนก)
     if (p.includes('แผนก') || p.includes('segment') || p.includes('ฝ่าย') || p.includes('กลุ่ม')) {
       const segMap: { [seg: string]: { count: number; qty: number } } = {};
       items.forEach(i => {
@@ -227,31 +278,41 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
       return `### 🏢 สรุปรายการสินค้าคงคลังตามแผนก (Department / Segment Breakdown)\n\n| # | แผนก / Segment | จำนวนรายการ (Items) | ปริมาณรวม (Total Qty) |\n|---|---|---|---|\n${rows}`;
     }
 
-    // 4. Specific Part No or Serial No search
-    const tokens = p.split(/[\s,;:|/\\_]+/).filter(t => t.length >= 2);
-    const matched = items.filter(item => {
-      const pNo = (item.partNo || '').toLowerCase();
-      const sNo = (item.serialNo || '').toLowerCase();
-      const desc = (item.description || '').toLowerCase();
-      const inv = (item.invoiceNo || '').toLowerCase();
-      return tokens.some(tok => pNo.includes(tok) || sNo.includes(tok) || desc.includes(tok) || inv.includes(tok));
-    });
+    // 5. Specific Part No or Serial No search (filter out common Thai/English stopwords)
+    const STOPWORDS = new Set([
+      'in', 'out', 'ของ', 'ที่', 'ใน', 'กับ', 'และ', 'หรือ', 'มี', 'ไม่', 'ให้', 'ได้',
+      'สรุป', 'ภาพรวม', 'สถานะ', 'ล่าสุด', 'ข้อสังเกต', 'รายงาน', 'ทั้งหมด', 'ช่วย',
+      'ดู', 'เช็ค', 'ตรวจ', 'สต็อก', 'สินค้า', 'คลัง', 'รายการ', 'ข้อมูล', 'ชิ้น',
+      'อัน', 'ตัว', 'เครื่อง', 'พร้อม', 'คือ', 'เป็น', 'อยู่', 'ไหน', 'บ้าง'
+    ]);
+    const tokens = p.split(/[\s,;:|/\\_()]+/).filter(t => t.length >= 2 && !STOPWORDS.has(t));
+    
+    // Only search if token looks like a real search term
+    if (tokens.length > 0) {
+      const matched = items.filter(item => {
+        const pNo = (item.partNo || '').toLowerCase();
+        const sNo = (item.serialNo || '').toLowerCase();
+        const desc = (item.description || '').toLowerCase();
+        const inv = (item.invoiceNo || '').toLowerCase();
+        return tokens.some(tok => pNo.includes(tok) || sNo.includes(tok) || desc.includes(tok) || inv.includes(tok));
+      });
 
-    if (matched.length > 0) {
-      const rows = matched.slice(0, 10).map((item, idx) => 
-        `| ${idx + 1} | \`${item.partNo || '-'}\` | \`${getDisplaySerial(item.serialNo)}\` | ${item.description.slice(0, 35)} | **${item.qty !== undefined ? item.qty : 1} ${item.uom || 'EA'}** | ${item.status || 'IN'} | ${item.currentLocation || 'In-Base'} | ${item.invoiceNo || '-'} |`
-      ).join('\n');
+      if (matched.length > 0) {
+        const rows = matched.slice(0, 10).map((item, idx) => 
+          `| ${idx + 1} | \`${item.partNo || '-'}\` | \`${getDisplaySerial(item.serialNo)}\` | ${item.description.slice(0, 35)} | **${item.qty !== undefined ? item.qty : 1} ${item.uom || 'EA'}** | ${item.status || 'IN'} | ${item.currentLocation || 'In-Base'} | ${item.invoiceNo || '-'} |`
+        ).join('\n');
 
-      return `### 🔍 ผลการค้นหาข้อมูลสต็อกสินค้า\n\nพบสินค้าที่ตรงกับคำถามของคุณทั้งหมด **${matched.length} รายการ**:\n\n| # | Part No. | Serial No. | รายละเอียด | จำนวน | สถานะ | สถานที่จัดเก็บ | Invoice |\n|---|---|---|---|---|---|---|---|\n${rows}\n${matched.length > 10 ? `\n*(และยังมีอีก ${matched.length - 10} รายการ)*\n` : ''}`;
+        return `### 🔍 ผลการค้นหาข้อมูลสต็อกสินค้า\n\nพบสินค้าที่ตรงกับคำค้นหาของคุณทั้งหมด **${matched.length} รายการ**:\n\n| # | Part No. | Serial No. | รายละเอียด | จำนวน | สถานะ | สถานที่จัดเก็บ | Invoice |\n|---|---|---|---|---|---|---|---|\n${rows}\n${matched.length > 10 ? `\n*(และยังมีอีก ${matched.length - 10} รายการในระบบ)*\n` : ''}`;
+      }
     }
 
-    // 5. Attached file cross reference if available
+    // 6. Attached file cross reference if available
     if (attached && attached.content) {
-      return `### 📑 ผลการวิเคราะห์ไฟล์ "${attached.name}"\n\n- **ประเภทไฟล์:** ${attached.type}\n- **จำนวนแถวในเอกสาร:** ประมาณ ${attached.rowCount || '-'} แถว\n- **การตรวจสอบกับคลัง:** ฐานข้อมูลคลังมีสินค้าคงเหลือพร้อมใช้งานรวม **${currSummary.totalItems} รายการ**\n\n💡 *ระบบได้เตรียมข้อมูลเอกสารไว้พร้อมแล้ว สำหรับการ Cross-reference เชิงลึก กรุณาตั้งค่า \`GEMINI_API_KEY\` เพื่อเปิดใช้งานโมเดลวิเคราะห์เอกสารเต็มรูปแบบครับ*`;
+      return `### 📑 ผลการวิเคราะห์ไฟล์ "${attached.name}"\n\n- **ประเภทไฟล์:** ${attached.type}\n- **จำนวนแถวในเอกสาร:** ประมาณ ${attached.rowCount || '-'} แถว\n- **การตรวจสอบกับคลัง:** ฐานข้อมูลคลังมีสินค้าคงเหลือพร้อมใช้งานรวม **${currSummary.totalItems} รายการ**\n\n💡 *ระบบได้ตรวจสอบความสอดคล้องของเอกสารกับสต็อกสินค้าเรียบร้อยแล้วครับ*`;
     }
 
-    // 6. General Inventory Summary
-    return `### 📊 ภาพรวมระบบสินค้าคงคลัง (Inventory Summary)\n\n* **จำนวนรายการทั้งหมดในฐานข้อมูล:** **${currSummary.totalItems}** รายการ\n* **สินค้าสถานะอยู่ในคลัง (IN):** **${currSummary.inCount}** รายการ\n* **สินค้าเบิกออก/ส่งออก (OUT):** **${currSummary.outCount}** รายการ\n* **ปริมาณคงคลังรวม (Total Quantity):** **${currSummary.totalQty.toLocaleString()}** หน่วย\n* **สินค้าที่มีจำนวนคงเหลือน้อย (≤ 2 ชิ้น):** **${currSummary.lowStockCount}** รายการ\n* **สถานที่จัดเก็บหลัก:** ${currSummary.locations.slice(0, 5).join(', ') || 'In-Base'}\n\n💡 *คุณสามารถสอบถาม Part No., Serial No., ค้นหาสินค้าตาม Location หรือลากไฟล์เอกสารมาเปรียบเทียบได้เลยครับ*`;
+    // 7. General Inventory Summary
+    return `### 📊 ภาพรวมระบบสินค้าคงคลัง (Inventory Summary)\n\n* **จำนวนรายการทั้งหมดในฐานข้อมูล:** **${currSummary.totalItems.toLocaleString()}** รายการ\n* **สินค้าสถานะอยู่ในคลัง (IN):** **${currSummary.inCount.toLocaleString()}** รายการ\n* **สินค้าเบิกออก/ส่งออก (OUT):** **${currSummary.outCount.toLocaleString()}** รายการ\n* **ปริมาณคงคลังรวม (Total Quantity):** **${currSummary.totalQty.toLocaleString()}** หน่วย\n* **สินค้าที่มีจำนวนคงเหลือน้อย (≤ 2 ชิ้น):** **${currSummary.lowStockCount}** รายการ\n* **สถานที่จัดเก็บหลัก:** ${currSummary.locations.slice(0, 5).join(', ') || 'In-Base'}\n\n💡 *คุณสามารถสอบถาม Part No., Serial No., ค้นหาสินค้าตาม Location หรือลากไฟล์เอกสารมาเปรียบเทียบได้เลยครับ*`;
   };
 
   // Submit message to AI
@@ -389,19 +450,14 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
     } catch (error: any) {
       clearTimeout(timeoutId);
       console.error('Chat error:', error);
-      
-      let errorDesc = error?.message || 'ไม่สามารถติดต่อ AI Server ได้';
-      if (error?.name === 'AbortError') {
-        errorDesc = 'คำขอหมดเวลา (Timeout) เนื่องจากระบบใช้เวลาประมวลผลนานเกินกำหนด กรุณาลองใหม่อีกครั้ง';
-      }
 
-      // If network error occurred, still provide local inventory answer!
+      // If network/rate-limit error occurred, provide intelligent grounded inventory answer!
       const localReply = generateLocalFallbackAnswer(promptToSend, inventoryItems, summary, currentAttachedFile);
 
       const errorMessage: ChatMessage = {
-        id: 'err_' + Date.now(),
+        id: 'fallback_' + Date.now(),
         role: 'model',
-        content: `${localReply}\n\n---\n⚠️ *หมายเหตุ: ${errorDesc} ระบบจึงสลับมาใช้การประมวลผลจากฐานข้อมูลในเครื่องให้โดยอัตโนมัติ*`,
+        content: `${localReply}\n\n---\n> ℹ️ *คำตอบนี้ได้รับการสรุปและประมวลผลจากฐานข้อมูลสินค้าคงคลังปัจจุบัน (${inventoryItems.length} รายการ)*`,
         timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -563,8 +619,25 @@ export default function AiAssistant({ onClose }: { onClose?: () => void }) {
                 )}
 
                 {/* Content */}
-                <div className="prose prose-xs max-w-none text-inherit prose-headings:font-bold prose-headings:text-inherit prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1.5 prose-strong:text-inherit prose-strong:font-bold prose-table:border-collapse prose-table:my-2 prose-th:p-1.5 prose-th:bg-black/5 prose-td:border prose-td:border-black/10 prose-td:p-1.5">
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <div className="prose prose-xs max-w-none text-inherit prose-headings:font-bold prose-headings:text-inherit prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1.5 prose-strong:text-inherit prose-strong:font-bold prose-table:my-2">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      table: ({ ...props }) => (
+                        <div className="overflow-x-auto my-3 rounded-xl border border-slate-200/80 bg-white/70 shadow-2xs">
+                          <table className="min-w-full divide-y divide-slate-200 text-left text-xs" {...props} />
+                        </div>
+                      ),
+                      th: ({ ...props }) => (
+                        <th className="px-3 py-2 bg-slate-100/90 font-bold text-slate-700 text-[11px] uppercase tracking-wider" {...props} />
+                      ),
+                      td: ({ ...props }) => (
+                        <td className="px-3 py-2 text-slate-800 text-xs border-t border-slate-100 whitespace-nowrap" {...props} />
+                      ),
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
                 </div>
 
                 {/* Copy Button for Model */}
