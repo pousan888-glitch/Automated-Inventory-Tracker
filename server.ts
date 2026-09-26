@@ -40,7 +40,15 @@ async function startServer() {
   // AI Chat endpoint with Live Inventory & Attached Files
   app.post('/api/ai/chat', async (req, res) => {
     try {
-      const { message, history = [], inventorySummary, inventoryItems = [], attachedFile } = req.body;
+      const { 
+        message, 
+        history = [], 
+        inventorySummary, 
+        inventoryItems = [], 
+        attachedFile,
+        model = 'gemini-3.5-flash',
+        rolePersona = 'general_assistant'
+      } = req.body;
 
       if (!process.env.GEMINI_API_KEY) {
         return res.status(500).json({ 
@@ -83,9 +91,25 @@ async function startServer() {
         attachedFileContext = `\n[ATTACHED FILE CONTENT / UPLOADED DATA]:\nFile Name: ${attachedFile.name || 'unnamed'}\nType: ${attachedFile.type || 'text'}\n---\n${attachedFile.content.slice(0, 15000)}\n---`;
       }
 
-      const systemInstruction = `You are "LogiTrack AI Inventory Assistant" (ผู้ช่วยอัจฉริยะจัดการคลังสินค้าและอะไหล่).
+      // Persona configuration
+      let personaTitle = 'ผู้ช่วยอัจฉริยะจัดการคลังสินค้าและอะไหล่ (General Inventory Assistant)';
+      let personaFocus = 'ครอบคลุมรอบด้าน ทั้งยอดสต็อกคงเหลือ พิกัดจัดเก็บ และความพร้อมใช้งาน';
+      if (rolePersona === 'warehouse_manager') {
+        personaTitle = 'ผู้ช่วยผู้จัดการคลังสินค้า (Warehouse Operations Specialist)';
+        personaFocus = 'เน้นการปฏิบัติการจริงในพื้นที่คลัง (Yard, Base, Workshop), ตรวจสอบพิกัดการจัดเก็บ (Current Location), ความเร็วในการกระจายสินค้า และความถูกต้องของการทำ Check IN / Check OUT';
+      } else if (rolePersona === 'procurement_analyst') {
+        personaTitle = 'นักวิเคราะห์สต็อกและวางแผนจัดซื้อ (Procurement & Demand Analyst)';
+        personaFocus = 'เน้นการวิเคราะห์สต็อกสินค้าคงเหลือน้อย (Safety Stock ≤ 2 หน่วย), ประเมินความเสี่ยงของขาดมือ (Stock-out Risk), อะไหล่สำรองสำคัญ และให้คำแนะนำการเปิด PR/PO จัดซื้อล่วงหน้า';
+      } else if (rolePersona === 'customs_compliance') {
+        personaTitle = 'ผู้เชี่ยวชาญศุลกากรและเอกสารนำเข้า-ส่งออก (Customs & Free Zone Compliance Specialist)';
+        personaFocus = 'เน้นการตรวจสอบสิทธิประโยชน์ภาษีในเขต Free Zone, ใบขนสินค้าขาเข้า/ขาออก, เลขที่ Invoice, Customs Status (Duty Paid/Bonded), และความถูกต้องของเอกสารควบคุมสินค้า';
+      }
+
+      const systemInstruction = `You are "LogiTrack AI - ${personaTitle}".
 You are integrated directly into the LogiTrack warehouse inventory system.
-Your job is to:
+Focus area: ${personaFocus}
+
+Your duties:
 1. Answer queries accurately based on the LIVE INVENTORY DATA and INVENTORY SYSTEM SUMMARY provided.
 2. If the user asks about stock balance, specific Part Numbers, Serial Numbers, Locations (In-Base, Rig, Yard, Export), Customs status, or low stock, give factual details from the context.
 3. If an ATTACHED FILE or pasted invoice/list is provided:
@@ -93,14 +117,15 @@ Your job is to:
    - Clearly identify: (a) Items already in stock (with available qty and current location), (b) Items not found / missing in inventory, (c) Any discrepancies.
    - Suggest appropriate stock action (e.g. Check IN / Check OUT).
 4. Provide structured, clean responses with markdown headings, tables, bullet points, or bold key numbers.
-5. Answer in Thai by default (or the language the user asked in), maintaining a helpful, polite, professional, and technically proficient tone.`;
+5. Provide actionable insights (ข้อสังเกตและข้อเสนอแนะ) tailored to your persona role.
+6. Answer in Thai by default (or the language the user asked in), maintaining a helpful, polite, professional, and technically proficient tone.`;
 
       // Build conversation contents
       const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
 
       // Include previous turns if available
       if (Array.isArray(history) && history.length > 0) {
-        for (const h of history.slice(-6)) {
+        for (const h of history.slice(-8)) {
           if (h.content) {
             contents.push({
               role: h.role === 'model' ? 'model' : 'user',
@@ -119,14 +144,19 @@ Your job is to:
       });
 
       const genAI = getGenAI();
-      const CANDIDATE_MODELS = [
+      const requestedModel = typeof model === 'string' && model.trim() ? model.trim() : 'gemini-3.5-flash';
+      const allAllowedModels = [
+        requestedModel,
+        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite',
         'gemini-3.5-flash-lite',
         'gemini-flash-latest',
-        'gemini-3.8-flash',
-        'gemini-3.1-flash-lite',
+        'gemini-3.1-pro-preview',
       ];
+      const CANDIDATE_MODELS = Array.from(new Set(allAllowedModels));
 
       let responseText = '';
+      let successfulModel = '';
       let lastError: any = null;
 
       for (const modelName of CANDIDATE_MODELS) {
@@ -141,6 +171,7 @@ Your job is to:
           });
           if (response && response.text) {
             responseText = response.text;
+            successfulModel = modelName;
             break;
           }
         } catch (err: any) {
@@ -156,6 +187,8 @@ Your job is to:
       res.json({
         success: true,
         reply: responseText || 'ขออภัย ไม่สามารถประมวลผลคำตอบได้ กรุณาลองใหม่อีกครั้ง',
+        modelUsed: successfulModel || requestedModel,
+        persona: rolePersona,
       });
     } catch (error: any) {
       console.error('Error generating AI response:', error);
